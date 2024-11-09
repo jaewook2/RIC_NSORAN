@@ -176,3 +176,37 @@ int mysend_socket(char* buf, std::string dest_ip, int payload_size) {
 
   return 0;
 }
+
+// send through socket
+int mysend_socket_string(std::string buf, std::string dest_ip) {
+
+  int control_sckfd = -1;
+
+  // get socket file descriptor
+  std::map<std::string, int>::iterator it;
+  for (it = agentIp_socket.begin(); it != agentIp_socket.end(); ++it) {
+    std::string agent_ip = it->first;
+
+    if (dest_ip.compare(agent_ip) == 0) {
+      control_sckfd = it->second;
+      break;
+    }
+  }
+
+  if (control_sckfd == -1) {
+    std::cout << "ERROR: Could not find socket for destination " << dest_ip << std::endl;
+    return -1;
+  }
+
+  
+  int sent_size =  send(control_sckfd, buf.c_str(), buf.size(), 0);
+  if(sent_size < 0) { // the send returns a size of -1 in case of errors
+      std::cout <<  "ERROR: SEND to agent " << dest_ip << std::endl;
+      return -2;
+  }
+  else {
+      std::cout << "Message sent: " << sent_size << " bytes !!" << std::endl;
+  }
+
+  return 0;
+}

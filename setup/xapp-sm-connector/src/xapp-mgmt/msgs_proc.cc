@@ -167,13 +167,10 @@ void XappMsgHandler::operator()(rmr_mbuf_t *message, bool *resend){
 				break;
 
 		case (RIC_INDICATION): {
-
 			mdclog_write(MDCLOG_INFO, "Received RIC indication message of type = %d", message->mtype);
-
 			unsigned char *me_id_null;
 			unsigned char *me_id = rmr_get_meid(message, me_id_null);
 			mdclog_write(MDCLOG_INFO,"RMR Received MEID: %s",me_id);
-
 			process_ric_indication(message->mtype, me_id, message->payload, message->len);
 
 			break;
@@ -225,19 +222,19 @@ void process_ric_indication(int message_type, transaction_identifier id, const v
 	std::cout << "ID " << id << std::endl;
 
 	// decode received message payload
-  E2AP_PDU_t *pdu = nullptr;
-  auto retval = asn_decode(nullptr, ATS_ALIGNED_BASIC_PER, &asn_DEF_E2AP_PDU, (void **) &pdu, message_payload, message_len);
+	E2AP_PDU_t *pdu = nullptr;
+	auto retval = asn_decode(nullptr, ATS_ALIGNED_BASIC_PER, &asn_DEF_E2AP_PDU, (void **) &pdu, message_payload, message_len);
 
-  // print decoded payload
-  if (retval.code == RC_OK) {
-    char *printBuffer;
-    size_t size;
-    FILE *stream = open_memstream(&printBuffer, &size);
-    asn_fprint(stream, &asn_DEF_E2AP_PDU, pdu);
-    mdclog_write(MDCLOG_DEBUG, "Decoded E2AP PDU: %s", printBuffer);
+	// print decoded payload
+	if (retval.code == RC_OK) {
+		char *printBuffer;
+		size_t size;
+		FILE *stream = open_memstream(&printBuffer, &size);
+		asn_fprint(stream, &asn_DEF_E2AP_PDU, pdu);
+		mdclog_write(MDCLOG_DEBUG, "Decoded E2AP PDU: %s", printBuffer);
 
-    uint8_t res = procRicIndication(pdu, id);
-  }
+		uint8_t res = procRicIndication(pdu, id);
+	}
 	else {
 		std::cout << "process_ric_indication, retval.code " << retval.code << std::endl;
 	}
@@ -245,11 +242,10 @@ void process_ric_indication(int message_type, transaction_identifier id, const v
 
 /*
  * Handle RIC indication
- * TODO doxy
- * SEHONG: 
- *       1. (completed) processing additional protocol IEs of case 29 (RIC request ID), case 25 (RIC indication header), case 26 (RIC indication message) 
- *       2. (ongoing) building CellMetric and UE Metric 
  */
+ // string create : log handler
+ // std: 
+ // std: 
 uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 {
    uint8_t idx;
@@ -263,14 +259,11 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
    uint64_t gMeasUnixTime_msec = 0x0;
    char gCellID[8]="0000000";
    int gPFContainterType = 0;
-   //printf("gCellID initalization: %s\n", gCellID);
-   //////////
 
-   printf("\n(SEHONG___)E2AP : RIC Indication received ");
+
+
+   printf("\nE2AP : RIC Indication received ");
    ricIndication = &e2apMsg->choice.initiatingMessage->value.choice.RICindication;
-
-   printf("protocolIEs elements %d\n", ricIndication->protocolIEs.list.count);
-
    for (idx = 0; idx < ricIndication->protocolIEs.list.count; idx++)
    {
       switch(ricIndication->protocolIEs.list.array[idx]->id)
@@ -281,26 +274,20 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 					RICrequestID_t	 cur_RICrequestID = ricIndication->protocolIEs.list.array[idx]-> value.choice.RICrequestID;
 					long ricrequestorid = cur_RICrequestID.ricRequestorID;
 					long ricinstanceid = cur_RICrequestID.ricInstanceID;
-
 					printf("ricRequestorID: %ld\n", ricrequestorid);
 					printf("ricInstanceID: %ld\n", ricinstanceid);
-
 					break;
 				}
 		        
 				
 				case 28:  // RIC indication type
 				{
-					long ricindicationType = ricIndication->protocolIEs.list.array[idx]-> \
-																		 value.choice.RICindicationType;
-
+					long ricindicationType = ricIndication->protocolIEs.list.array[idx]-> value.choice.RICindicationType;
 					printf("ricindicationType %ld\n", ricindicationType);
-
 					break;
 				}
 				case 27:  // RIC indication SN
 				{
-					// TO DO
 					break;
 				}
 				case 26:  // RIC indication message
@@ -309,122 +296,39 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 
 					struct tm *tm_info;
 					time_t unix_timestamp;
+					unix_timestamp = (time_t) (floor(gMeasUnixTime_msec/1000.0)); // msec --> sec
+					tm_info = localtime(&unix_timestamp); //gmtime : localtime
 
-					printf("MeasUnixTime (msec) in RIC Indication Header: \n");
-					printf("unix time (ms): %lu, unix time (sec): %lu\n", gMeasUnixTime_msec, (uint64_t)(floor(gMeasUnixTime_msec/1000.0)));
-						unix_timestamp = (time_t) (floor(gMeasUnixTime_msec/1000.0)); // msec --> sec
-						tm_info = localtime(&unix_timestamp); //gmtime : localtime
-						printf("Year: %d, Month: %d, Day: %d, Hour: %d, Minute: %d, Second: %d, msec: %lu\n",  tm_info->tm_year + 1900, \
-						 																			tm_info->tm_mon + 1, \
-																									tm_info->tm_mday, \
-																									tm_info->tm_hour + 9,\
-																									tm_info->tm_min,\
-																									tm_info->tm_sec, \
-																									(gMeasUnixTime_msec - (uint64_t)(floor(gMeasUnixTime_msec/1000.0)) * 1000));
-
-					printf("Cell ID got in RIC Indication Header: %s\n", gCellID);
-					
 					bool flag_ue = false; // this is indicator for writing data into influxDB, that is to send data on socket
 					bool flag_cell = false; // this is indicator for writing data into influxDB, that is to send data on socket
 					UeMetricsEntry *ueMetrics = NULL;
 					CellMetricsEntry *cellMetrics = NULL;
 
-					int payload_size = ricIndication->protocolIEs.list.array[idx]-> \
-																		 value.choice.RICindicationMessage.size;
-
-
+					int payload_size = ricIndication->protocolIEs.list.array[idx]->value.choice.RICindicationMessage.size;
 					char* payload = (char*) calloc(payload_size, sizeof(char));
-					memcpy(payload, ricIndication->protocolIEs.list.array[idx]-> \
-																		 value.choice.RICindicationMessage.buf, payload_size);
-
-					//printf("Payload %s\n", payload);
-					printf("======== RIC indication message =========\n");
-					DumpHex(payload, payload_size);
-
-					// E2SM-KPM Details
-					// 1. add some header files and c files into asn1c_defs: move all files in oran-e2sim/src/ASN1c into xapp-sm-connector/asn1c_defs
-					// 2. delete or comment "...asn_oer_...." parts .
-					// 1-1) header files: E2SM-KPM-IndicationMessage.h, E2SM-KPM-IndicationMessage-Format1.h, CellObjectID.h
-					//      PM-Containers-Item.h, PM-Info-Item.h, PerUE-PM-Item.h, UE-Identity.h, RAN-Container.h, PF-Container.h, ODU-PF-Container.h,
-					//      OCUCP-PF-Container.h, OCUUP-PF-Container.h, CellResourceReportListItem.h, NRCGI.h, ServedPlmnPerCellListItem.h,
-					//      MeasurementType.h, MeasurementValue.h, MeasurementTypeName.h, MeasurementTypeID.h, NativeReal.h, NRCellIdentity.h
-					//      PF-ContainerListItem.h, NI-Type.h, CUUPMeasurement-Container.h, L3-RRC-Measurements.h, RRCEvent.h, PlmnID-Item.h
-					//      FGC-DU-PM-Container.h, EPC-DU-PM-Container.h, SlicePerPlmnPerCellListItem.h, SNSSAI.h, PerQCIResportListItem.h, QCI.h,
-					//      FGC-CUUP-PM-Format.h, EPC-CUUP-PM-Format.h, ServingCellMeasurements.h, MeasResultNeighCells.h, REAL.h, PerQCIReportListItemFormat.h,
-					//      S-NSSAI.h, MeasResultServMOList.h, MeasResultPCell.h, PhysCellId.h, RSRP-Range.h, RSRQ-Range.h, MeasResultListNR.h, MeasResultListEUTRA.h,
-					//      FQIPERSlicesPerPlmnPerCellListItem.h, FiveQI.h, SliceToReportListItem.h, MeasResultEUTRA.h, MeasQuantityResultsEUTRA.h, MeasResultNR.h
-					//      FQIPERSlicePerPlmnListItem.h, MeasQualityResult.h, SINR-Range.h, RSRP-RangeEUTRA.h, RSRQ-RangeEUTRA.h, SINR-RangeEUTRA.h,
-					//      ResultsPerCSI-RS-Index.h, ResultsPerCSI-RS-IndexList.h, ResultsPerSSB-Index.h, ResultsPerSSB-IndexList.h, CSI-RS-Index.h, SSB-Index.h,
-					//      MeasResultServMO.h, ServCellIOndex.h
-					// 1-2) c files: E2SM-KPM-IndicationMessage.c, E2SM-KPM-IndicationMessage-Format1.c, CellObjectID.c, OCUCP-PF-Container.c, OCUUP-PF-Container.c
-					//      PM-Containers-Item.c, PM-Info-Item.c, PerUE-PM-Item.c, UE-Identity.c, RAN-Container.c, PF-Container.c, ODU-PF-Container.c, 
-					//      CellResourceReportListItem.c, MeasurementType.c, MeasurementTypeID.c,  MeasurementValue.c, NRCGI.c, ServedPlmnPerCellListItem.c
-					//      MeasurementTypeName.c, CUUPMeasurement-Container.c, RRCEvent.c, FGC-DU-PM-Container.c, EPC-DU-PM-Container.c, PlmnID-Item.c,
-					//      EPC-CUUP-PM-Format.c, NativeReal.c, L3-RRC-Measurements.c, NRCellIdentity.c, REAL.c, PerQCIReportListItemFormat.c, QCI.c, ServingCellMeasurement.c,
-					//      MeasResultNeighCells.c, SlicePerPlmnPerCellListItem.c, SlicePerPlmnPerCellListItem.c, FGC-CUUP-PM-Format.c, PF-ContainerListItem.c
-					//      FQIPERSlicesPerPlmnPerCellListItem.c, MeasResultListEUTRA.c, MeasResultEUTRA.c, MeasQuantityResultsEUTRA.c, MeasResultListNR.c, MeasResultNR.c
-					//      PerQCIReportListItem.c, RSRP-Range.c, RSRQ-Range.c, S-NSSAI.c, SlicoReportListItem.c, SNSSAI.c, FiveQI.c
-					//      FQIPERSlicePerPlmnListItem.c,  MeasQualityResult.c, SINR-Range.c, RSRP-RangeEUTRA.c, RSRQ-RangeEUTRA.c, SINR-RangeEUTRA.c
-					//      ResultsPerCSI-RS-Index.c, ResultsPerCSI-RS-IndexList.c, ResultsPerSSB-Index.c, ResultsPerSSB-IndexList.c, SSB-Index.c, PhyCellId.c, 
-					//      MeasResultPCell.c, MeasResultServMOList.c, MeasResultServMO.c, ServCellIOndex.c
-					// 1-3) delete (comment) and make zero "asn_OER_.... " part in E2SM-KPM-IndicationMessage.c, E2SM-KPM-IndicationMessage-Format1.c, NI-Type.c
-					//      CellObjectID.h, UE-Identity.h, RAN-Container.h, MeasurementTypeName.h, MeasurementTypeID.h, NativeReal.h, NRCellIdentity.h
-					//      NI-Type.h, RRCEvent.h, QCI.h, REAL.h, PhysCellId.h, RSRP-Range.h, RSRQ-Range.h, FiveQI.h, SINR-Range.h, RSRP-RangeEUTRA.h, RSRQ-RangeEUTRA.h, SINR-RangeEUTRA.h
-					//      ,  CSI-RS-Index.h, SSB-Index.h, ServCellIOndex.h
-					//
-					//      CellObjectID.c, PerUE-PM-Item.c, PF-Container.c, ODU-PF-Container.c, CellResourceReportListItem.c, MeasurementType.c, 
-					//      MeasurementValue.c, OCUCP-PF-Container.c, OCUUP-PF-Container.c, MeasurementTypeID.c, MeasurementTypeName.c, CUUPMeasurement-Container.c
-					//      RRCEvent.c, FGC-DU-PM-Container.c, EPC-DU-PM-Container.c, EPC-CUUP-PM-Format.c, NRCellIdentity.c, PerQCIReportListItemFormat.c, QCI.c, 
-					//      ServingCellMeasurement.c, MeasResultNeighCells.c, SlicePerPlmnPerCellListItem.c, FGC-CUUP-PM-Format.c, FQIPERSlicesPerPlmnPerCellListItem.c
-					//      MeasResultListEUTRA.c, MeasResultListNR.c, NI-Type.c, erQCIReportListItem.c, RSRP-Range.c, RSRQ-Range.c, S-NSSAI.c, SlicoReportListItem.c, SNSSAI.c,
-					//      FiveQI.c, FQIPERSlicePerPlmnListItem.c, SINR-Range.c, RSRP-RangeEUTRA.c, RSRQ-RangeEUTRA.c, SINR-RangeEUTRA.c, ResultsPerCSI-RS-IndexList.c, 
-					//      ResultsPerSSB-IndexList.c,  CSI-RS-Index.c, SSB-Index.c, hyCellId.c, MeasResultServMOList.c, ServCellIOndex.c
-					// 1-4) existing file modified: about "... ans_oer_..."
-				    //      NativeEnumerated.h, NativeEnumerted.c
+					memcpy(payload, ricIndication->protocolIEs.list.array[idx]->value.choice.RICindicationMessage.buf, payload_size);
 
 					E2SM_KPM_IndicationMessage_t* decodedMsg = e2sm_decode_ric_indication_message(payload, payload_size);
-					//printf("// E2SM-KPM decodedMsg= %x\n",decodedMsg);
 
 					unsigned long indMsg_present = (unsigned long) (decodedMsg->present);
-					printf("Ind Msg present: %ld\n", indMsg_present);
 					if (indMsg_present == 1) {
-						//printf("////entered indMsg_present = 1 \n");
 						E2SM_KPM_IndicationMessage_Format1_t *indMsgrFormat1 = decodedMsg->choice.indicationMessage_Format1;
-
-						// 1. Processing pm_Containers
 						int count_PMContainer = int(indMsgrFormat1->pm_Containers.list.count);
-						printf("// --PMContainer counts: %d \n", count_PMContainer);
-						for (int i = 0; i < count_PMContainer; i++) { // Always one loop (that is, count_PMContainer == 1)
-							// Do I need to initialize metric values??
-
-							printf("// -- -- %d-th PMContainer processing \n", i+1);
-							
+						for (int i = 0; i < count_PMContainer; i++) { 							
 							PM_Containers_Item_t pmContainer = *(PM_Containers_Item_t *)(indMsgrFormat1->pm_Containers.list.array[i]);
-							/* Errors:
-							// error 1 : 'PM_Containers_Item_t' was not declared in this scope
-							// SOLVED: insert #include <PM-Containers-Item.h> in msgs_proc.hpp
-							// error 2: error: invalid use of incomplete type 'struct PF_Container, ....'
-							// SOLVED: insert #include <PM-Container.h>, .... in msgs_proc.hpp
-							*/
-							// 1-1: Processing performanceContainer
 							if (pmContainer.performanceContainer != NULL) { // performanceContainer is optional
-								//printf("////// entered e2sm if pmContainer.performanceContainer != NULL \n");
 								int perfContainerType = (int)(pmContainer.performanceContainer->present);
+								printf("message type: %d", perfContainerType);
 								gPFContainterType = perfContainerType;
-								//printf("////// e2sm perfContainerType: %d\n", perfContainerType);
 								if (perfContainerType == 1) {
-									printf("// -- -- e2sm in type1 perfContainerType of oDU \n");
 									struct ODU_PF_Container	*oDU_PF = pmContainer.performanceContainer->choice.oDU;
 									int count_oDUcellResourceReportListItem = oDU_PF->cellResourceReportList.list.count;
-									printf("// -- -- oDU - cell Resource Report List Item Count: %d \n", count_oDUcellResourceReportListItem);
 
 									// Cell Metric: PRBUsage (AvailablePRBs)
 									if ((gPFContainterType == 1) && (flag_cell == false)) {
 										cellMetrics = (CellMetricsEntry *) malloc(sizeof(CellMetricsEntry));
 										flag_cell = true;
-										cellMetrics->MetricType = (0xF0F0000000000000 + (1 << (gPFContainterType - 1))); // Cell Metric for O-CUUP (gPFContainterType == 3)
-										printf("TEST of bit operator in ODU: 0x%lX\n",(1 << (gPFContainterType - 1)));
-										printf("TEST of Metric Type for Cell Metric in ODU: 0x%lX\n",cellMetrics->MetricType);
+										cellMetrics->MetricType = gPFContainterType; 
 										cellMetrics->MeasUnixTime_msec = gMeasUnixTime_msec;
 										strncpy(cellMetrics->CellID, gCellID, strlen(gCellID));
 									}
@@ -433,40 +337,23 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 									if ((gPFContainterType == 1) && (flag_ue == false)) {
 										ueMetrics = (UeMetricsEntry *) malloc(sizeof(UeMetricsEntry));
 										flag_ue = true;
-										ueMetrics->MetricType = (0x1010000000000000 + (1 << (gPFContainterType - 1))); // Cell Metric for O-CUUP (gPFContainterType == 3)
-										printf("TEST of bit operator in ODU: 0x%lX\n",(1 << (gPFContainterType - 1)));
-										printf("TEST of Metric Type for UE Metric in ODU: 0x%lX\n",ueMetrics->MetricType);
+										ueMetrics->MetricType = gPFContainterType; // Cell Metric for O-CUUP (gPFContainterType == 3)
 										ueMetrics->MeasUnixTime_msec = gMeasUnixTime_msec;
 										strncpy(ueMetrics->ServingCellID, gCellID, strlen(gCellID));
 									}
-									//////////
+
 									for (int j = 0; j < count_oDUcellResourceReportListItem; j++) {
 										printf("%d-th oDU - cell Resource Report List Item processing \n", j+1);
 										
 										CellResourceReportListItem_t cellResourceReport = *(CellResourceReportListItem_t *)(oDU_PF->cellResourceReportList.list.array[j]);
 										long plmnid_size = (long)(cellResourceReport.nRCGI.pLMN_Identity.size);
-										//printf("oDU - cell Resource Report: NRCGI pLMN_Identity ---\n");
-										//DumpHex((char *)(cellResourceReport.nRCGI.pLMN_Identity.buf), plmnid_size);
-
 										char *test_plmnId = ParsePLMNIdentity(cellResourceReport.nRCGI.pLMN_Identity.buf, plmnid_size);
-										if (test_plmnId != NULL) {
-											printf("PLMNIdentity value %s\n", test_plmnId);
-										}
-
 										long nrCellID_size = (long)(cellResourceReport.nRCGI.nRCellIdentity.size);
 										int nrCellID_BitsUnsued_size = (int)(cellResourceReport.nRCGI.nRCellIdentity.bits_unused);
-										//printf("--- oDU - cell Resource Report: NRCGI nRCellIdentity (UnUsed bits %d)---\n", nrCellID_BitsUnsued_size);
-										//DumpHex((char *)(cellResourceReport.nRCGI.nRCellIdentity.buf), nrCellID_size);
-
 										char *test_CellID = ParseNRCGI(cellResourceReport.nRCGI);
-										if (test_CellID != NULL) {
-											printf("NRCGI value %s\n", test_CellID);
-										}
-
 										long stat_dl_TotalofAvailablePRBs =  -1;
 										if (cellResourceReport.dl_TotalofAvailablePRBs != NULL) {
 											stat_dl_TotalofAvailablePRBs =  (long)(*(cellResourceReport.dl_TotalofAvailablePRBs));
-											printf("dl_TotalofAvailablePRBs : %ld\n", stat_dl_TotalofAvailablePRBs);
 										} 
 										// Cell Metric for O-DU
 										if ((gPFContainterType == 1) && flag_cell) {
@@ -477,81 +364,59 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 										long stat_ul_TotalofAvailablePRBs =  -1;
 										if (cellResourceReport.ul_TotalofAvailablePRBs != NULL) {
 											stat_ul_TotalofAvailablePRBs =  (long)(*(cellResourceReport.ul_TotalofAvailablePRBs));
-											printf("ul_TotalofAvailablePRBs : %ld\n", stat_ul_TotalofAvailablePRBs);
 										} 
-										//cellMetrics.TotalofAvailablePRBsUL = stat_ul_TotalofAvailablePRBs;
-										//cellMetrics.MeasPeriodPDCP = 20; // why?
+
 
 										int count_ServedPlmnPerCellListItem = cellResourceReport.servedPlmnPerCellList.list.count;
 										for (int k = 0; k < count_ServedPlmnPerCellListItem; k++) {
 											ServedPlmnPerCellListItem_t servedPlmnPerCell = (ServedPlmnPerCellListItem_t)(*(cellResourceReport.servedPlmnPerCellList.list.array[k]));
 											long served_plmnid_size = (long)(servedPlmnPerCell.pLMN_Identity.size);
-											printf("--- oDU - cell Resource Report: Served pLMN_Identity ---\n");
-											//DumpHex((char *)(servedPlmnPerCell.pLMN_Identity.buf), served_plmnid_size);
 
 											if (servedPlmnPerCell.du_PM_5GC != NULL) {
-												printf("enterend servedPlmnPerCell.du_PM_5GC \n");
 												int count_slicePerPlmnPerCellListItem = (int)(servedPlmnPerCell.du_PM_5GC->slicePerPlmnPerCellList.list.count);
 												for (int l = 0; l < count_slicePerPlmnPerCellListItem; l++) {
-													printf("%d-th slice per plmn per cell list item \n", l);
 													SlicePerPlmnPerCellListItem_t slicePerPlmnPerCell = *(SlicePerPlmnPerCellListItem_t *)(servedPlmnPerCell.du_PM_5GC->slicePerPlmnPerCellList.list.array[l]);
 													int sliceID_sST_size = slicePerPlmnPerCell.sliceID.sST.size;
-													printf("--- slice ID sST in slice per plmn per cell ---\n");
-													DumpHex((char *)(slicePerPlmnPerCell.sliceID.sST.buf), sliceID_sST_size);
 
 													if (slicePerPlmnPerCell.sliceID.sD != NULL) {
 														int sliceID_sD_size = slicePerPlmnPerCell.sliceID.sD->size;
-														printf("--- slice ID sD in slice per plmn per cell ---\n");
-														DumpHex((char *)(slicePerPlmnPerCell.sliceID.sD->buf), sliceID_sD_size);
 													}
 
 													int count_FQIPERSlicesPerPlmnPerCell = int(slicePerPlmnPerCell.fQIPERSlicesPerPlmnPerCellList.list.count);
 													for (int m = 0; m < count_FQIPERSlicesPerPlmnPerCell; m++) {
-														printf("%d-th FQI per slice per plmn per cell list item \n", m);
 														FQIPERSlicesPerPlmnPerCellListItem_t fQIPerSlicePerPlmnPerCell = *(FQIPERSlicesPerPlmnPerCellListItem_t *)(slicePerPlmnPerCell.fQIPERSlicesPerPlmnPerCellList.list.array[m]);
 														long val_fiveQI = fQIPerSlicePerPlmnPerCell.fiveQI;
-														printf("----------- val fiveQI : %ld \n", val_fiveQI);
-														//ueMetrics.FiveQI = val_fiveQI;
 
 														long val_FQI_dl_PRBUsage = -1;
 														if (fQIPerSlicePerPlmnPerCell.dl_PRBUsage != NULL) {
 															val_FQI_dl_PRBUsage = (long)(*(fQIPerSlicePerPlmnPerCell.dl_PRBUsage));
 														} 
-														printf("----------- val FQI_dl_PRBUsage : %ld \n", val_FQI_dl_PRBUsage);
 														//ueMetrics.PRBUsageDL = val_FQI_dl_PRBUsage;
 
 														long val_FQI_ul_PRBUsage = -1;
 														if (fQIPerSlicePerPlmnPerCell.ul_PRBUsage != NULL) {
 															val_FQI_ul_PRBUsage = (long)(*(fQIPerSlicePerPlmnPerCell.ul_PRBUsage));
 														} 
-														printf("----------- val FQI_ul_PRBUsage : %ld \n", val_FQI_ul_PRBUsage);
 														//ueMetrics.PRBUsageUL = val_FQI_ul_PRBUsage;
 													}
 												}
 											}
 
 											if (servedPlmnPerCell.du_PM_EPC != NULL) {
-												printf("--- enterend servedPlmnPerCell.du_PM_EPC \n");
 												int count_perQCIReportListItem = (int)(servedPlmnPerCell.du_PM_EPC->perQCIReportList_du.list.count);
 												for (int l = 0; l < count_perQCIReportListItem; l++) {
-													printf("%d-th perQCIReportList item \n", l+1);
 													PerQCIReportListItem_t perQCIReport = *(PerQCIReportListItem_t *)(servedPlmnPerCell.du_PM_EPC->perQCIReportList_du.list.array[l]);
 													long val_qci = (long) (perQCIReport.qci);
-													printf("----------- val_qci : %ld \n", val_qci);
 													//ueMetrics.QCI = val_qci;
 
 													long val_perQCIReport_dl_PRBUsage = -1;
 													if (perQCIReport.dl_PRBUsage != NULL) {
 														val_perQCIReport_dl_PRBUsage = (long)(*perQCIReport.dl_PRBUsage);
-														printf("----------- val perQCI_dl_PRBUsage : %ld \n", val_perQCIReport_dl_PRBUsage);
 													} 
-													//printf("----------- val perQCI_dl_PRBUsage : %ld \n", val_perQCIReport_dl_PRBUsage);
-													//ueMetrics.PRBUsageDL =  val_perQCIReport_dl_PRBUsage;
 
 													long val_perQCIReport_ul_PRBUsage = -1;
 													if (perQCIReport.ul_PRBUsage != NULL) {
 														val_perQCIReport_ul_PRBUsage = (long)(*perQCIReport.ul_PRBUsage);
-														printf("----------- val perQCI_ul_PRBUsage : %ld \n", val_perQCIReport_ul_PRBUsage);
 													} 
 												}
 
@@ -559,149 +424,76 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 										}
 									}
 								} else if (perfContainerType == 2) {
-									// Ue Metric 
 									if (!flag_ue && (strcmp(gCellID, "1111") != 0)) {
 										ueMetrics = (UeMetricsEntry *) malloc(sizeof(UeMetricsEntry));
 										flag_ue = true;
-										ueMetrics->MetricType = (0x1010000000000000 + (1 << (gPFContainterType - 1))); // Ue Metric for O-CUCP (gPFContainterType == 2)
-										printf("TEST of bit operator in OCUCP: 0x%lX\n",(1 << (gPFContainterType - 1)));
-										printf("TEST of Metric Type for Ue Metric in OCUCP: 0x%lX\n",ueMetrics->MetricType);
+										ueMetrics->MetricType = gPFContainterType; // Ue Metric for O-CUCP (gPFContainterType == 2)
 										ueMetrics->MeasUnixTime_msec = gMeasUnixTime_msec;
 										strncpy(ueMetrics->ServingCellID, gCellID, strlen(gCellID));
 										ueMetrics->ServingCellID[strlen(gCellID)] = '\0';
 									}
-									////////
-									printf("// -- --  e2sm in type2 perfContainerType of oCU_CP \n");
 									struct OCUCP_PF_Container	*oCUCP_PF = pmContainer.performanceContainer->choice.oCU_CP;
 									long nActUEs = -1;
 									if (oCUCP_PF->cu_CP_Resource_Status.numberOfActive_UEs != NULL) {
 										nActUEs = *(long *)(oCUCP_PF->cu_CP_Resource_Status.numberOfActive_UEs);
-										printf("--- oCUCP_PF - number of Active UEs: %ld \n", nActUEs);
 									} 
-									//printf("oCUCP_PF - number of Active UEs: %ld \n", nActUEs);
-
-								} else if (perfContainerType == 3) {
-									// Cell Metric
+								} else if (perfContainerType == 3) { //O-CUUP message
 									if (!flag_cell) {
 										cellMetrics = (CellMetricsEntry *) malloc(sizeof(CellMetricsEntry));
 										flag_cell = true;
-										cellMetrics->MetricType = (0xF0F0000000000000 + (1 << (gPFContainterType - 1))); // Cell Metric for O-CUUP (gPFContainterType == 3)
-										printf("TEST of bit operator in OCUUP: 0x%lX\n",(1 << (gPFContainterType - 1)));
-										printf("TEST of Metric Type for Cell Metric in OCUUP: 0x%lX\n",cellMetrics->MetricType);
+										cellMetrics->MetricType = gPFContainterType; // Cell Metric for O-CUUP (gPFContainterType == 3)
 										cellMetrics->MeasUnixTime_msec = gMeasUnixTime_msec;
 										strncpy(cellMetrics->CellID, gCellID, strlen(gCellID));
 										cellMetrics->CellID[strlen(gCellID)] = '\0';
 									}
-									////////
 
-									printf("// -- -- e2sm in type3 perfContainerType of oCU_UP \n");
 									struct OCUUP_PF_Container	*oCUUP_PF = pmContainer.performanceContainer->choice.oCU_UP;
 									int count_oCUUPpfContainerListItem = oCUUP_PF->pf_ContainerList.list.count;
-									printf("--- oCUUP - PF Container List Item Count: %d \n", count_oCUUPpfContainerListItem);
 									for (int j = 0; j < count_oCUUPpfContainerListItem; j++) {
-										printf("%d-th oCUUP - PF Container List Item processing \n", j+1);
-										
 										PF_ContainerListItem_t oCUUP_PF_item =  *(PF_ContainerListItem_t *)(oCUUP_PF->pf_ContainerList.list.array[j]);
 										long val_oCUUP_PF_interface_type = (long) (oCUUP_PF_item.interface_type);
-										printf("val. oCUUP PF_interface type: %ld \n", val_oCUUP_PF_interface_type);
-
 										int count_oCUUP_PMContainer_plmnListItem= (int)(oCUUP_PF_item.o_CU_UP_PM_Container.plmnList.list.count);
 										for (int k = 0; k < count_oCUUP_PMContainer_plmnListItem; k++) {
-											printf("%d-th oCUUP_PMContainer_plmnList item \n", k);
 											PlmnID_Item_t cuUPPlmn = *(PlmnID_Item_t *)(oCUUP_PF_item.o_CU_UP_PM_Container.plmnList.list.array[k]);
 											int cuUPPlmn_pLMN_ID_size = (int)(cuUPPlmn.pLMN_Identity.size);
-											printf("--- cuUPPlmn_pLMN_ID ---\n");
-											DumpHex((char *)(cuUPPlmn.pLMN_Identity.buf), cuUPPlmn_pLMN_ID_size);
-
 											char *test_cuUPPlmn_pLMN_ID = ParsePLMNIdentity(cuUPPlmn.pLMN_Identity.buf, cuUPPlmn_pLMN_ID_size);
-											if (test_cuUPPlmn_pLMN_ID != NULL) {
-												printf("test_cuUPPlmn_pLMN_ID %s\n", test_cuUPPlmn_pLMN_ID);
-											}
 
 											if (cuUPPlmn.cu_UP_PM_5GC != NULL) {
-												printf("enterend cuUPPlmn.cu_UP_PM_5GC \n");
 												int count_sliceToReportListItem = (int)(cuUPPlmn.cu_UP_PM_5GC->sliceToReportList.list.count);
-												printf("count_sliceToReportListItem: %d \n", count_sliceToReportListItem);
 												for (int l = 0; l < count_sliceToReportListItem; l++) {
-													printf("%d-th slice to report list item \n", l);
 													SliceToReportListItem_t sliceToReportListItem = *(SliceToReportListItem_t *)(cuUPPlmn.cu_UP_PM_5GC->sliceToReportList.list.array[l]);
-													
 													int sliceID_sST_size2 = sliceToReportListItem.sliceID.sST.size;
-													printf("--- slice ID sST in slice to report ---\n");
-													DumpHex((char *)(sliceToReportListItem.sliceID.sST.buf), sliceID_sST_size2);
 													if (sliceToReportListItem.sliceID.sD != NULL) {
 														int sliceID_sD_size2 = sliceToReportListItem.sliceID.sD->size;
-														printf("--- slice ID sD in  slice to report  ---\n");
-														DumpHex((char *)(sliceToReportListItem.sliceID.sD->buf), sliceID_sD_size2);
 													}
-													
 													int count_FQIPERSlicesPerPlmnList = int(sliceToReportListItem.fQIPERSlicesPerPlmnList.list.count);
-													printf("count_FQIPERSlicesPerPlmnList: %d \n", count_FQIPERSlicesPerPlmnList);
 													for (int m = 0; m < count_FQIPERSlicesPerPlmnList; m++) {
-														//UeMetricsEntry ueMetrics;
-
-														printf("%d-th FQI per slice per plmn list item \n", m);
-														FQIPERSlicesPerPlmnListItem_t fQIPerSlicePerPlmn = *(FQIPERSlicesPerPlmnListItem_t *)(sliceToReportListItem.fQIPERSlicesPerPlmnList.list.array[m]);
-														
+														FQIPERSlicesPerPlmnListItem_t fQIPerSlicePerPlmn = *(FQIPERSlicesPerPlmnListItem_t *)(sliceToReportListItem.fQIPERSlicesPerPlmnList.list.array[m]);	
 														long val_fiveQI2 = fQIPerSlicePerPlmn.fiveQI;
-														printf("----------- val fiveQI2 : %ld \n", val_fiveQI2);
-
-														if (fQIPerSlicePerPlmn.pDCPBytesDL != NULL) {
-															int size_FQI_pDCPBytesDL = (int)(fQIPerSlicePerPlmn.pDCPBytesDL->size);
-															printf("--- FQI_pDCPBytesDL  ---\n");
-															DumpHex((char *)(fQIPerSlicePerPlmn.pDCPBytesDL->buf), size_FQI_pDCPBytesDL);
-														} 
-														if (fQIPerSlicePerPlmn.pDCPBytesUL != NULL) {
-															int size_FQI_pDCPBytesUL = (int)(fQIPerSlicePerPlmn.pDCPBytesUL->size);
-															printf("--- FQI_pDCPBytesUL  ---\n");
-															DumpHex((char *)(fQIPerSlicePerPlmn.pDCPBytesUL->buf), size_FQI_pDCPBytesUL);
-														} 
 													}
 												}
 											}
 
 											if (cuUPPlmn.cu_UP_PM_EPC != NULL) {
-												printf("enterend cuUPPlmn.cu_UP_PM_EPC \n");
 												int count_perQCIReportList_cuup_Item = (int)(cuUPPlmn.cu_UP_PM_EPC->perQCIReportList_cuup.list.count);
-												printf("count_perQCIReportList_cuup_Item: %d \n", count_perQCIReportList_cuup_Item);
 												for (int l = 0; l < count_perQCIReportList_cuup_Item; l++) {
-													//UeMetricsEntry ueMetrics;
-
-													printf("%d-th perQCIReportList_cuup item \n", l);
 													PerQCIReportListItemFormat_t perQCIReport2 = *(PerQCIReportListItemFormat_t *)(cuUPPlmn.cu_UP_PM_EPC->perQCIReportList_cuup.list.array[l]);
 													long val_drbqci = (long) (perQCIReport2.drbqci);
-													printf("----------- val drbqci  : %ld \n", val_drbqci);
-													//ueMetrics.QCI = val_drbqci;
-
 													if (perQCIReport2.pDCPBytesDL != NULL) {
 														int size_perQCIReport_pDCPBytesDL = (int)(perQCIReport2.pDCPBytesDL->size);
-														printf("--- QCIReport_pDCPBytesDL  --- (size: %d)\n", size_perQCIReport_pDCPBytesDL); // 2 or 3 bytes in case of eNB and 1 byte in case of gNB
-														DumpHex((char *)(perQCIReport2.pDCPBytesDL->buf), size_perQCIReport_pDCPBytesDL);
 														char chr_pDCPBytesDL[size_perQCIReport_pDCPBytesDL];
 														strncpy((char *)chr_pDCPBytesDL, (char *)(perQCIReport2.pDCPBytesDL->buf), size_perQCIReport_pDCPBytesDL);
 														if (size_perQCIReport_pDCPBytesDL == 2) { 
-															//printf("test size 2- \n");
-															//DumpHex((char *)chr_pDCPBytesDL, size_perQCIReport_pDCPBytesDL);
 															int val_pDCPBytesDL = (((int)chr_pDCPBytesDL[0]) << 8) | ((int)chr_pDCPBytesDL[1]);
-															printf("--- val. QCIReport_pDCPBytesDL: %d\n", val_pDCPBytesDL);
 														} else if (size_perQCIReport_pDCPBytesDL == 3) { // in case of macro eNB
-															//printf("test size 3- \n");
-															//DumpHex((char *)chr_pDCPBytesDL, size_perQCIReport_pDCPBytesDL);
 															int val_pDCPBytesDL = (((int)chr_pDCPBytesDL[0]) << 16) | (((int)chr_pDCPBytesDL[1]) << 8) | ((int)chr_pDCPBytesDL[2]);
-															printf("--- val. QCIReport_pDCPBytesDL: %d\n", val_pDCPBytesDL);
 														} else if (size_perQCIReport_pDCPBytesDL == 4) { // in case of macro eNB
-															//printf("test size 4 - \n");
-															//DumpHex((char *)chr_pDCPBytesDL, size_perQCIReport_pDCPBytesDL);
 															int val_pDCPBytesDL = (((int)chr_pDCPBytesDL[0]) << 24) | (((int)chr_pDCPBytesDL[1]) << 16) | (((int)chr_pDCPBytesDL[2]) << 8) | ((int)chr_pDCPBytesDL[3]);
-															printf("--- val. QCIReport_pDCPBytesDL: %d\n", val_pDCPBytesDL);
 														}
 														//strncpy(ueMetrics.pDCPBytesDL, (char *)(perQCIReport2.pDCPBytesDL->buf), size_perQCIReport_pDCPBytesDL);
 													} 
 													if (perQCIReport2.pDCPBytesUL != NULL) {
 														int size_perQCIReport_pDCPBytesUL = (int)(perQCIReport2.pDCPBytesUL->size);
-														printf("--- QCIReport_pDCPBytesUL  --- (size: %d)\n", size_perQCIReport_pDCPBytesUL);
-														DumpHex((char *)(perQCIReport2.pDCPBytesUL->buf), size_perQCIReport_pDCPBytesUL);
-														//strncpy(ueMetrics.pDCPBytesUL, (char *)(perQCIReport2.pDCPBytesUL->buf), size_perQCIReport_pDCPBytesUL);
 													} 
 												}
 											}
@@ -714,44 +506,28 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 							// 1-2: Processing theRANContainer - NULL
 							if (pmContainer.theRANContainer != NULL) { // theRANContainer is optional
 								long theRANContainer_size = (long)(pmContainer.theRANContainer->size);
-								printf("--- theRANContainer ---\n");
-								DumpHex((char *)(pmContainer.theRANContainer->buf), theRANContainer_size);
 							}
 						}
 
-						// 2. Processing cellObjectID - oDU (cellID): 4 bytes, oCUUP: 0bytes, oCUCP(NRCellCU): 8 bytes
-						long size_cellObjectID = (long) (indMsgrFormat1->cellObjectID.size);
-						printf("// -- cellObjectID --- (size: %ld)\n", size_cellObjectID);
-						if (size_cellObjectID > 0) {
-							DumpHex((char *)(indMsgrFormat1->cellObjectID.buf), size_cellObjectID);
-						}
 						
 						// 3. Processing *list_of_PM_Information
-						
 						if (indMsgrFormat1->list_of_PM_Information != NULL) {
 							int count_PMInfo = int(indMsgrFormat1->list_of_PM_Information->list.count);
-							printf("PMInformation counts: %d \n", count_PMInfo);
 							char tempMeasurementTypeName[30] = ""; // This is for RRU.PrbUsedDl of Cell Metric in O-DU
 							long temp_PrbUsedDl = -1;
 
 							for (int i = 0; i < count_PMInfo; i++) {
-								printf("%d-th PMInformation processing \n", i);
 								PM_Info_Item_t pmInfo = *(PM_Info_Item_t *)(indMsgrFormat1->list_of_PM_Information->list.array[i]);
 								// 3-1: pmType
 								int pmInfo_type = (int)(pmInfo.pmType.present);
 								if (pmInfo_type == 1) { // MeasurementType_PR_measName
-									printf("// -- -- MeasurementType_PR_measName \n");
 									MeasurementTypeName_t val_measName = pmInfo.pmType.choice.measName;
 									int val_measName_size = (int) (val_measName.size);
-									printf("MeasurementTypeName (size: %d)\n", val_measName_size);
-									DumpHex((char *)(val_measName.buf), val_measName_size);
 									strncpy(tempMeasurementTypeName, (char *)(val_measName.buf), val_measName_size);
 									tempMeasurementTypeName[val_measName_size] = '\0';
 									
 								} else if (pmInfo_type == 2) { // MeasurementType_PR_measID
-									printf("// -- -- MeasurementType_PR_measID \n");
 									long val_measID = (long)(pmInfo.pmType.choice.measID);
-									printf("MeasurementType_PR_measID: %ld\n", val_measID);
 								} else {
 									printf("Invalid pmInfo type \n");
 								}
@@ -760,99 +536,53 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 								int pmVal_type = (int)(pmInfo.pmVal.present);
 								if (pmVal_type == 1) { // long	 valueInt
 									long pmVal_valueInt = (long)(pmInfo.pmVal.choice.valueInt);
-									printf("pmVal_valueInt: %ld\n", pmVal_valueInt);
 									temp_PrbUsedDl = pmVal_valueInt;
 								} else if (pmVal_type == 2) { // double	 valueReal
 									double pmVal_valueReal = (double)(pmInfo.pmVal.choice.valueReal);
-									printf("pmVal_valueReal: %f\n", pmVal_valueReal);
 								} else if (pmVal_type == 3) { // no value
 
 								} else if (pmVal_type == 4) { // struct L3_RRC_Measurements	*valueRRC
 									L3_RRC_Measurements_t rrcValue = *(L3_RRC_Measurements_t *)(pmInfo.pmVal.choice.valueRRC);
 									long val_rrcEvent = (long)(rrcValue.rrcEvent);
-									if (val_rrcEvent == 0) {
-										printf("RRCEvent_b1 with val_rrcEvent = 0 \n");
-									} else if (val_rrcEvent == 1) {
-										printf("RRCEvent_a3 with val_rrcEvent = 1 \n");
-									} else if (val_rrcEvent == 2) {
-										printf("RRCEvent_a5 with val_rrcEvent = 2 \n");
-									} else if (val_rrcEvent == 3) {
-										printf("RRCEvent_periodic with val_rrcEvent = 3 \n");
-									} else {
-										printf("unsupported rrcEvent vlaue \n");
-									}
-
 									if (rrcValue.servingCellMeasurements != NULL) {
 										int servCellMeasType = (int)(rrcValue.servingCellMeasurements->present);
 										if (servCellMeasType == 1) { // struct MeasResultServMOList	*nr_measResultServingMOList;
-											printf("Serving Cell Measurements Type: nr_measResultServingMOList \n");
 											int count_nr_measResultServMO = (int)(rrcValue.servingCellMeasurements->choice.nr_measResultServingMOList->list.count);
 											for (int j = 0; j < count_nr_measResultServMO; j++) {
-												printf("%d-th nr_measResultServMO \n", j);
 												MeasResultServMO_t nr_measResultServingMO = *(MeasResultServMO_t *)(rrcValue.servingCellMeasurements->choice.nr_measResultServingMOList->list.array[j]);
 												long measResServMO_servCellId = (long)(nr_measResultServingMO.servCellId);
-												printf("measResServMO_servCellId: %ld", measResServMO_servCellId);
-
 												long val_physCellId = (long)(*(PhysCellId_t *)(nr_measResultServingMO.measResultServingCell.physCellId));
-												printf("val_physCellId: %ld \n", val_physCellId);
 
 												if (nr_measResultServingMO.measResultServingCell.measResult.cellResults.resultsSSB_Cell != NULL) {
 													struct MeasQuantityResults *val_resultsSSB_Cell = nr_measResultServingMO.measResultServingCell.measResult.cellResults.resultsSSB_Cell;
-
 													long val_resSSBCell_rsrp = -1;
 													if (val_resultsSSB_Cell->rsrp != NULL) {
 														val_resSSBCell_rsrp = *(long *)(val_resultsSSB_Cell->rsrp);
-														printf("val_resSSBCell_rsrp : %ld \n", val_resSSBCell_rsrp);
 													}
-													//printf("val_resSSBCell_rsrp : %ld \n", val_resSSBCell_rsrp);
 
 													long val_resSSBCell_rsrq = -1;
 													if (val_resultsSSB_Cell->rsrq != NULL) {
 														val_resSSBCell_rsrq = *(long *)(val_resultsSSB_Cell->rsrq);
-														printf("val_resSSBCell_rsrq : %ld \n", val_resSSBCell_rsrq);
 													}
-													//printf("val_resSSBCell_rsrq : %ld \n", val_resSSBCell_rsrq);
 
 													long val_resSSBCell_sinr = -1;
 													if (val_resultsSSB_Cell->sinr != NULL) {
 														val_resSSBCell_sinr = *(long *)(val_resultsSSB_Cell->sinr);
-														printf("val_resSSBCell_sinr : %ld \n", val_resSSBCell_sinr);
 													}
-													//printf("val_resSSBCell_sinr : %ld \n", val_resSSBCell_sinr);
-												}
-												if (nr_measResultServingMO.measResultServingCell.measResult.cellResults.resultsCSI_RS_Cell != NULL) {
-													printf("resultsCSI_RS_Cell \n");
-												}
-												if (nr_measResultServingMO.measResultServingCell.measResult.rsIndexResults->resultsSSB_Indexes != NULL) {
-													printf("resultsSSB_Indexes \n");
-												}
-												if (nr_measResultServingMO.measResultServingCell.measResult.rsIndexResults->resultsCSI_RS_Indexes != NULL) {
-													printf("resultsCSI_RS_Indexes \n");
 												}
 											}
-										} if (servCellMeasType == 2) { // struct MeasResultPCell	*eutra_measResultPCell;
-											printf("Serving Cell Measurements Type: eutra_measResultPCell \n");
-
-										} else {
-											printf("unsupported Serving Cell Measurements Type \n");
+										}
+									} else {
+										printf("Invalid pmValue type \n");
+									}
+								// Cell Metric: RRU.PrbUsedDl
+									if (strncmp(tempMeasurementTypeName, "RRU.PrbUsedDl", strlen("RRU.PrbUsedDl")) == 0) { //MeasurementTypeName == "RRU.PrbUsedDl"
+										if ((gPFContainterType == 1) && (flag_cell)) {
+											cellMetrics->UsedPRBs = temp_PrbUsedDl;
 										}
 									}
-								} else {
-									printf("Invalid pmValue type \n");
-								}
-								// Cell Metric: RRU.PrbUsedDl
-								printf("TEST (OUT): tempMeasurementTypeName is %s\n", tempMeasurementTypeName);
-								if (strncmp(tempMeasurementTypeName, "RRU.PrbUsedDl", strlen("RRU.PrbUsedDl")) == 0) { //MeasurementTypeName == "RRU.PrbUsedDl"
-									printf("TEST (IN): tempMeasurementTypeName is %s\n", tempMeasurementTypeName);
-									if ((gPFContainterType == 1) && (flag_cell)) {
-										cellMetrics->UsedPRBs = temp_PrbUsedDl;
-										printf("TEST: value of RRU.PrbUsedDl is %ld\n", temp_PrbUsedDl);
-									}
-								}
-								//////////
-
-
-							} // for loop END
+								} // for loop END
+							}
 						}
 						
 						// 4. Processing *list_of_matched_UEs
@@ -872,34 +602,25 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 							if (flag_ue) {
 								ueMetrics->MatchedUEsTotNum = count_matchedUEs;
 							}
-
-							printf("list_of_matched_UEs counts: %d \n", count_matchedUEs);
+							// UE Information
 							for (int i = 0; i < count_matchedUEs; i++) {
-								// Ue Metric: RemainingUEsCount(O), UeID, DL_throughput, ServingCellRF, NeighborCell1/2/3_RF
+								// Per UE information
+
 								if (flag_ue) {
 									ueMetrics->RemainingUEsCount = count_matchedUEs - (i + 1);
 								}
-								///////////////////
-								printf("%d-th matched_UE processing \n", i);
 								PerUE_PM_Item_t perUE_PM = *(PerUE_PM_Item_t *)(indMsgrFormat1->list_of_matched_UEs->list.array[i]);
 								int size_ueID = (int)(perUE_PM.ueId.size);
-								printf("PerUE_PM UE Identity (size: %d)\n", size_ueID);
-								DumpHex((char *)(perUE_PM.ueId.buf), size_ueID);
 								strncpy(strUEID, (char *)(perUE_PM.ueId.buf), size_ueID);
 								intUEID = atoi(strUEID);
-								printf("TEST: tempUEID = (str) %s, (int) %d\n", strUEID, intUEID);
-								// Ue Metric: RemainingUEsCount, UeID(0), DL_throughput, ServingCellRF, NeighborCell1/2/3_RF
 								if (flag_ue) {
 									ueMetrics->UeID = intUEID;
 								}
 								///////////////////
 								indicatorMapUE = indicatorMapUE | (1 << (intUEID-1));
-								printf("TEST: indicatorMapUE is %x\n", indicatorMapUE);
 
 								int count_PerUE_PM_info= int(perUE_PM.list_of_PM_Information->list.count);
-								printf("count_PerUE_PM_info: %d \n", count_PerUE_PM_info);
 								for (int j = 0; j < count_PerUE_PM_info; j++) {
-									printf("%d-th PMInformation processing for perUE_PM \n", j);
 									PM_Info_Item_t pmInfo_perUE_PM = *(PM_Info_Item_t *)(perUE_PM.list_of_PM_Information->list.array[j]);
 
 									char ueMeasurementTypeName[30] = ""; // This is for DRB.UEThpDl.UEID of Ue Metric in O-DU
@@ -908,19 +629,13 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 									// 4-1: pmType
 									int pmInfo_type_perUE_PM = (int)(pmInfo_perUE_PM.pmType.present);
 									if (pmInfo_type_perUE_PM == 1) { // MeasurementType_PR_measName
-										printf("// -- -- MeasurementType_PR_measName \n");
 										MeasurementTypeName_t val_measName_perUE_PM = pmInfo_perUE_PM.pmType.choice.measName;
 										int val_measName_size_perUE_PM = (int) (val_measName_perUE_PM.size);
-										printf("MeasurementTypeName (size: %d)\n", val_measName_size_perUE_PM);
-										DumpHex((char *)(val_measName_perUE_PM.buf), val_measName_size_perUE_PM);
-
 										strncpy(ueMeasurementTypeName, (char *)(val_measName_perUE_PM.buf), val_measName_size_perUE_PM);
 										ueMeasurementTypeName[val_measName_size_perUE_PM] = '\0';
 										
 									} else if (pmInfo_type_perUE_PM == 2) { // MeasurementType_PR_measID
-										printf("// -- -- MeasurementType_PR_measID \n");
 										long val_measID_perUE_PM = (long)(pmInfo_perUE_PM.pmType.choice.measID);
-										printf("MeasurementType_PR_measID: %ld\n", val_measID_perUE_PM);
 									} else {
 										printf("Invalid pmInfo type \n");
 									}
@@ -929,91 +644,47 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 									int pmVal_type_perUE_PM = (int)(pmInfo_perUE_PM.pmVal.present);
 									if (pmVal_type_perUE_PM == 1) { // long	 valueInt
 										long pmVal_valueInt_perUE_PM = (long)(pmInfo_perUE_PM.pmVal.choice.valueInt);
-										printf("pmVal_valueInt: %ld\n", pmVal_valueInt_perUE_PM);
 									} else if (pmVal_type_perUE_PM == 2) { // double	 valueReal
 										double pmVal_valueReal_perUE_PM = (double)(pmInfo_perUE_PM.pmVal.choice.valueReal);
-										printf("pmVal_valueReal: %f\n", pmVal_valueReal_perUE_PM);
 										temp_DRB_UEThpDl_UEID = pmVal_valueReal_perUE_PM; // this value may not be DRB_UEThpDl_UEID
 									} else if (pmVal_type_perUE_PM == 3) { // no value
 
 									} else if (pmVal_type_perUE_PM == 4) { // struct L3_RRC_Measurements	*valueRRC
 										L3_RRC_Measurements_t rrcValue_perUE_PM = *(L3_RRC_Measurements_t *)(pmInfo_perUE_PM.pmVal.choice.valueRRC);
 										long val_rrcEvent_perUE_PM = (long)(rrcValue_perUE_PM.rrcEvent);
-										if (val_rrcEvent_perUE_PM == 0) {
-											printf("RRCEvent_b1 with val_rrcEvent = 0 \n");
-										} else if (val_rrcEvent_perUE_PM == 1) {
-											printf("RRCEvent_a3 with val_rrcEvent = 1 \n");
-										} else if (val_rrcEvent_perUE_PM == 2) {
-											printf("RRCEvent_a5 with val_rrcEvent = 2 \n");
-										} else if (val_rrcEvent_perUE_PM == 3) {
-											printf("RRCEvent_periodic with val_rrcEvent = 3 \n");
-										} else {
-											printf("unsupported rrcEvent vlaue \n");
-										}
 
 										if (rrcValue_perUE_PM.servingCellMeasurements != NULL) {
-											printf("p4 - L3 RRC: servingCellMeasurements \n");
 											ServingCellMeasurements_t *SCM = (ServingCellMeasurements_t *)(rrcValue_perUE_PM.servingCellMeasurements);
 											//int rrc_ServingCellRFellMeas = rrcValue_perUE_PM.servingCellMeasurements->present;
 											int rrc_ServingCellRFellMeas = int(SCM->present);
 											if (rrc_ServingCellRFellMeas == 1) { //nr_measResultServingMOList
 												//int count_nr_measResultServMO1 = (int) (rrcValue_perUE_PM.servingCellMeasurements->choice.nr_measResultServingMOList->list.count);
 												int count_nr_measResultServMO1 = int(SCM->choice.nr_measResultServingMOList->list.count);
-												printf("count_nr_measResultServMO1 %d \n", count_nr_measResultServMO1);
 												for (int k = 0; k < count_nr_measResultServMO1; k++) {
-													printf("%d-th nr_measResultServMO \n", k);
 													//MeasResultServMO_t nr_measResultServingMO1 = *(MeasResultServMO_t *)(rrcValue_perUE_PM.servingCellMeasurements->choice.nr_measResultServingMOList->list.array[k]);
 													MeasResultServMO_t nr_measResultServingMO1 = *(MeasResultServMO_t *)(SCM->choice.nr_measResultServingMOList->list.array[k]);
 													long measResServMO_servCellId1 = (long)(nr_measResultServingMO1.servCellId);
-													printf("measResServMO_servCellId1: %ld\n", measResServMO_servCellId1);
-
 													long val_physCellId1 = (long)(*(PhysCellId_t *)(nr_measResultServingMO1.measResultServingCell.physCellId));
-													printf("val_physCellId: %ld \n", val_physCellId1);
-
 													if (nr_measResultServingMO1.measResultServingCell.measResult.cellResults.resultsSSB_Cell != NULL) {
 														struct MeasQuantityResults *val_resultsSSB_Cell1 = nr_measResultServingMO1.measResultServingCell.measResult.cellResults.resultsSSB_Cell;
-
 														long val_resSSBCell_rsrp1 = -1;
 														if (val_resultsSSB_Cell1->rsrp != NULL) {
 															val_resSSBCell_rsrp1 = *(long *)(val_resultsSSB_Cell1->rsrp);
 														}
-														//printf("val_resSSBCell_rsrp1 : %ld \n", val_resSSBCell_rsrp1);
-
 														long val_resSSBCell_rsrq1 = -1;
 														if (val_resultsSSB_Cell1->rsrq != NULL) {
 															val_resSSBCell_rsrq1 = *(long *)(val_resultsSSB_Cell1->rsrq);
 														}
-														//printf("val_resSSBCell_rsrq1 : %ld \n", val_resSSBCell_rsrq1);
-
 														long val_resSSBCell_sinr1 = -1;
 														if (val_resultsSSB_Cell1->sinr != NULL) {
 															val_resSSBCell_sinr1 = *(long *)(val_resultsSSB_Cell1->sinr);
 														}
-														printf("val_resSSBCell_sinr1 : %ld \n", val_resSSBCell_sinr1);
-														// Ue Metric: RemainingUEsCount, UeID, DL_throughput, ServingCellRF (O), NeighborCell1/2/3_RF
 														if ((gPFContainterType == 2) && (flag_ue)) {
 															ueMetrics->ServingCellRF.RSSINR = val_resSSBCell_sinr1;
-															printf("TEST: value of ServingCellRF RSSINR is %ld\n", val_resSSBCell_sinr1);
 														}
-														///////////////////
 													}
-													//printf("HERE 1 (k = %d)\n", k);
 													if (nr_measResultServingMO1.measResultServingCell.measResult.cellResults.resultsCSI_RS_Cell != NULL) {
-														printf("resultsCSI_RS_Cell1 \n");
 													}
-													//printf("HERE 2 (k = %d)\n", k);
-													/*
-													ResultsPerSSB_IndexList_t *AAA = (ResultsPerSSB_IndexList_t *)(nr_measResultServingMO1.measResultServingCell.measResult.rsIndexResults->resultsSSB_Indexes);
-													if (AAA != NULL) {
-														printf("TO-DO: resultsSSB_Indexes1 \n");
-													}
-													printf("HERE 3 (k = %d)\n", k);
-													ResultsPerCSI_RS_IndexList_t *BBB = (ResultsPerCSI_RS_IndexList_t *)(nr_measResultServingMO1.measResultServingCell.measResult.rsIndexResults->resultsCSI_RS_Indexes);
-													if (BBB != NULL) {
-														printf("resultsCSI_RS_Indexes1 \n");
-													}
-													printf("HERE 4 (k = %d)\n", k);
-													*/
 												}
 
 											} else if (rrc_ServingCellRFellMeas == 2) { // struct MeasResultPCell	*eutra_measResultPCell;
@@ -1024,29 +695,21 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 										}
 
 										if (rrcValue_perUE_PM.measResultNeighCells != NULL) {
-											printf("p4 - L3 RRC: measResultNeighCells \n");
 											MeasResultNeighCells_t *MRNC = (MeasResultNeighCells_t *)(rrcValue_perUE_PM.measResultNeighCells);
 											int mRNCType = int(MRNC->present);
 											if (mRNCType == 1) { //
 												int count_measResultNR = int(MRNC->choice.measResultListNR->list.count);
-												printf("count_measResultNR %d \n", count_measResultNR);
 												for (int k = 0; k < count_measResultNR; k++) {
 													MeasResultNR_t *valMRNC = (MeasResultNR_t *)(MRNC->choice.measResultListNR->list.array[k]);
-													printf("Done: (%d-th) count_measResultNR loops in measResultNeighCells (Type 1) \n", k);
 													uint64_t val_physCellId2 = (uint64_t)(*(PhysCellId_t *)(valMRNC->physCellId));
-													printf("val_physCellId2: %lu \n", val_physCellId2);
 
-													// Ue Metric: RemainingUEsCount, UeID, DL_throughput, ServingCellRF, NeighborCell1/2/3_RF (Cell ID: 0)
 													if ((gPFContainterType == 2) && (flag_ue)) {
 														if (k == 0) {
 															ueMetrics->NeighborCell1_RF.CellID = val_physCellId2;
-															printf("TEST: value of %d-th Neigh. Cell ID is %lu\n", k+1, val_physCellId2);
 														} else if (k == 1) {
 															ueMetrics->NeighborCell2_RF.CellID = val_physCellId2;
-															printf("TTEST: value of %d-th Neigh. Cell ID is %lu\n", k+1, val_physCellId2);
 														} else if (k == 2) {
 															ueMetrics->NeighborCell3_RF.CellID = val_physCellId2;
-															printf("TEST: value of %d-th Neigh. Cell ID is %lu\n", k+1, val_physCellId2);
 														} else {
 															printf("TEST: value of %d-th Neigh. Cell ID (not supported)\n", k+1);
 														}
@@ -1059,34 +722,22 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 														long val_resSSBCell_rsrp2 = -1;
 														if (val_resultsSSB_Cell2->rsrp != NULL) {
 															val_resSSBCell_rsrp2 = *(long *)(val_resultsSSB_Cell2->rsrp);
-															printf("val_resSSBCell_rsrp2 : %ld \n", val_resSSBCell_rsrp2);
 														}
-														//printf("val_resSSBCell_rsrp2 : %ld \n", val_resSSBCell_rsrp2);
-
 														long val_resSSBCell_rsrq2= -1;
 														if (val_resultsSSB_Cell2->rsrq != NULL) {
 															val_resSSBCell_rsrq2 = *(long *)(val_resultsSSB_Cell2->rsrq);
-															printf("val_resSSBCell_rsrq2 : %ld \n", val_resSSBCell_rsrq2);
 														}
-														//printf("val_resSSBCell_rsrq2 : %ld \n", val_resSSBCell_rsrq2);
-
 														long val_resSSBCell_sinr2 = -1;
 														if (val_resultsSSB_Cell2->sinr != NULL) {
 															val_resSSBCell_sinr2 = *(long *)(val_resultsSSB_Cell2->sinr);
-															printf("val_resSSBCell_sinr2 : %ld \n", val_resSSBCell_sinr2);
 														}
-														//printf("val_resSSBCell_sinr2 : %ld \n", val_resSSBCell_sinr2);
-														// Ue Metric: RemainingUEsCount, UeID, DL_throughput, ServingCellRF, NeighborCell1/2/3_RF (Cell ID: 0)
 														if ((gPFContainterType == 2) && (flag_ue)) {
 															if (k == 0) {
 																ueMetrics->NeighborCell1_RF.CellRF.RSSINR = val_resSSBCell_sinr2;
-																printf("TEST: value of %d-th Neigh. Cell RSSINR is %lu\n", k+1, val_resSSBCell_sinr2);
 															} else if (k == 1) {
 																ueMetrics->NeighborCell2_RF.CellRF.RSSINR = val_resSSBCell_sinr2;
-																printf("TTEST: value of %d-th Neigh. Cell RSSINR is %lu\n", k+1, val_resSSBCell_sinr2);
 															} else if (k == 2) {
 																ueMetrics->NeighborCell3_RF.CellRF.RSSINR = val_resSSBCell_sinr2;
-																printf("TEST: value of %d-th Neigh. Cell RSSINR is %lu\n", k+1, val_resSSBCell_sinr2);
 															} else {
 																printf("TEST: value of %d-th Neigh. Cell RSSINR (not supported)\n", k+1);
 															}
@@ -1110,17 +761,16 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 									} else {
 										printf("Invalid pmValue type for perUE_PM \n");
 									}
-									// Ue Metric: RemainingUEsCount, UeID, DL_throughput (0) : in DU, ServingCellRF, NeighborCell1/2/3_RF
 									if (strncmp(ueMeasurementTypeName, "DRB.UEThpDl.UEID", strlen("DRB.UEThpDl.UEID")) == 0) { //MeasurementTypeName == "DRB.UEThpDl.UEID	"
 										if ((gPFContainterType == 1) && (flag_ue)) {
 											ueMetrics->DL_throughput = temp_DRB_UEThpDl_UEID;
-											printf("TEST: value of DRB.UEThpDl.UEID is %f\n", temp_DRB_UEThpDl_UEID);
 										}
 									}
 									///////////////////
 								}  
 								// Ue Metric: Sending the completed Ue Metric for a specific UE over socket
 								if (flag_ue) { // O-CU-CP or O-DU
+									/*
 									printf("======== ueMetric in O-CU-CP is about to be sent over socket  =========\n");
 									printf("UeMetric - MetricType: 0x%lX\n", ueMetrics->MetricType);
 									printf("UeMetric - MeasUnixTime_msec: %lu\n", ueMetrics->MeasUnixTime_msec);
@@ -1129,24 +779,74 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 									printf("UeMetric - UeID: %lu\n", ueMetrics->UeID);
 									printf("UeMetric - DlThp (effective only in O-DU): %f\n", ueMetrics->DL_throughput);
 									printf("UeMetric - svcID : %s\n", ueMetrics->ServingCellID);
-									//printf("UeMetric - svcRF-RSRP : %ld\n", ueMetrics->ServingCellRF.RSRP);
-									//printf("UeMetric - svcRF-RSRQ : %ld\n", ueMetrics->ServingCellRF.RSRQ);
 									printf("UeMetric - svcRF-RSSINR : %ld\n", ueMetrics->ServingCellRF.RSSINR);
 									printf("UeMetric - ngcID1 : %lu\n", ueMetrics->NeighborCell1_RF.CellID);
-									//printf("UeMetric - ngcRF1-RSRP : %ld\n", ueMetrics->NeighborCell1_RF.CellRF.RSRP);
-									//printf("UeMetric - ngcRF1-RSRQ : %ld\n", ueMetrics->NeighborCell1_RF.CellRF.RSRQ);
 									printf("UeMetric - ngcRF1-RSSINR : %ld\n", ueMetrics->NeighborCell1_RF.CellRF.RSSINR);
 									printf("UeMetric - ngcID2 : %lu\n", ueMetrics->NeighborCell2_RF.CellID);
-									//printf("UeMetric - ngcRF2-RSRP : %ld\n", ueMetrics->NeighborCell2_RF.CellRF.RSRP);
-									//printf("UeMetric - ngcRF2-RSRQ : %ld\n", ueMetrics->NeighborCell2_RF.CellRF.RSRQ);
 									printf("UeMetric - ngcRF2-RSSINR : %ld\n", ueMetrics->NeighborCell2_RF.CellRF.RSSINR);
 									printf("UeMetric - ngcID3 : %lu\n", ueMetrics->NeighborCell3_RF.CellID);
-									//printf("UeMetric - ngcRF3-RSRP : %ld\n", ueMetrics->NeighborCell3_RF.CellRF.RSRP);
-									//printf("UeMetric - ngcRF3-RSRQ : %ld\n", ueMetrics->NeighborCell3_RF.CellRF.RSRQ);
 									printf("UeMetric - ngcRF3-RSSINR : %ld\n", ueMetrics->NeighborCell3_RF.CellRF.RSSINR);
 									
 									printf("TEST: UeMetric Size to send: %d\n", sizeof(UeMetricsEntry));
-									mysend_socket((char *)ueMetrics, agent_ip, sizeof(UeMetricsEntry));
+									*/
+									if (ueMetrics->MetricType == 2){
+									// for cucp message
+										std::string m_cellId = ueMetrics->ServingCellID;
+										uint64_t imsi = ueMetrics->UeID;
+										int64_t sinrThisCell = ueMetrics->ServingCellRF.RSSINR;										
+										uint64_t neighcellId1 = ueMetrics->NeighborCell1_RF.CellID;
+										int64_t neighcellSINR1 =ueMetrics->NeighborCell1_RF.CellRF.RSSINR;
+										uint64_t neighcellId2 = ueMetrics->NeighborCell2_RF.CellID;
+										int64_t neighcellSINR2 =ueMetrics->NeighborCell2_RF.CellRF.RSSINR;
+										uint64_t neighcellId3 = ueMetrics->NeighborCell3_RF.CellID;
+										int64_t neighcellSINR3 =ueMetrics->NeighborCell3_RF.CellRF.RSSINR;
+										
+										printf("CU-CP Message from %s gNB with informations\n",  ueMetrics->ServingCellID);
+										std::string to_show = "Time : "+ std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + "Imsi of UE : " +std::to_string (imsi) + "," +\
+										"Number of associated UEs : "+ std::to_string (ueMetrics->MatchedUEsTotNum) + \
+										"\n" + "," +"SINR between Serving Cell and UE :" + std::to_string (sinrThisCell) +"\n" \
+										+"SINR between Cell (ID:" + std::to_string (neighcellId1)+ ") and UE :" + std::to_string (neighcellSINR1) +"\n"\
+										+"SINR between Cell (ID:" + std::to_string (neighcellId2)+ ") and UE :" + std::to_string (neighcellSINR2) +"\n"\
+										+"SINR between Cell (ID:" + std::to_string (neighcellId3)+ ") and UE :" + std::to_string (neighcellSINR3) +"\n"\
+										// cucp message
+										std::string reprot_type = "";
+										if (ueMetrics->MetricType == 1){
+											reprot_type = "du";
+										} else if (ueMetrics->MetricType == 2){
+											reprot_type = "cucp";
+										} else {
+											reprot_type = "cuup";
+										}
+										std::string to_print = reprot_type +","+ std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + std::to_string (imsi) + "," +\
+										std::to_string (ueMetrics->MatchedUEsTotNum) + "," + "numDrb" +","+"5QI";
+
+										std::string servingStr = ","+ m_cellId + ","  + std::to_string (imsi) + "," + std::to_string (sinrThisCell) + "," + std::to_string (0) ;
+										std::string neighsinr = "," + std::to_string (neighcellId1) + "," + std::to_string (neighcellSINR1) + "," + std::to_string (0) \
+															+ "," + std::to_string (neighcellId2) + "," + std::to_string (neighcellSINR2) + "," + std::to_string (0)  \
+															+"," + std::to_string (neighcellId3) + "," + std::to_string (neighcellSINR3) + "," + std::to_string (0)  \
+															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
+															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
+															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
+															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
+															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
+															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  ;
+										to_print = to_print + servingStr +neighsinr;
+										
+										printf("Sending Message to Agent : ");
+										std::cout << to_print << std::endl;
+
+										mysend_socket_string(to_print, agent_ip);
+										
+										//std::string fileName = check_trace (m_cellId, ueMetrics->MetricType);
+										//bool ret = XappMsgHandler::writeTrace (fileName, to_print );
+										//std::ofstream csv{};
+      									//csv.open (fileName.c_str (), std::ios_base::app);
+										//to_print = to_print + "\n";
+										//csv << to_print;
+										//csv.close ();
+										
+										//map_ue_information.insert(pair<int,  std::string>(i, to_print));
+									}
 
 									if (ueMetrics->RemainingUEsCount > 0) {
 										printf("TEST: another ue Metric shoud be delivered over socket\n");
@@ -1168,29 +868,19 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 						printf("Unknonw RIC Indication Message Type \n");
 					}
 					e2sm_free_ric_indication_message(decodedMsg);
-
 					free(payload);
-					
-					// send payload to agent --> SEHONG: send UE and Cell Metrics to agent. how?
-					//std::string agent_ip = find_agent_ip_from_gnb(gnb_id); <-- move it to front part of this case
-					//mysend_socket(payload, agent_ip, payload_size);
 
-					// test - Cell Metrics
-					// CellMetricsEntry *cellMetrics = (CellMetricsEntry *) malloc(sizeof(CellMetricsEntry));
 
-					// cellMetrics->MetricType = 0xF0F0F0F0F0F0F0F0;
-					// cellMetrics->MeasUnixTime_msec = gMeasUnixTime_msec;
-					// cellMetrics->UsedPRBs = 100;
-					// cellMetrics->TotDLAvailPRBs = 193;
-					// cellMetrics->TotNumServUEs = 5;
-					// cellMetrics->bitmap_servUEs = 0b0000000101010101;
-					// strncpy((char *)(cellMetrics->CellID), "1113", sizeof("1113"));
+					// print ue information
+
+
+
 					if (strcmp(gCellID, "1111") != 0) {
 						printf("Cell ID is %s (This value should not be <1111>)\n", gCellID);
 						if (flag_cell) {
 							// 
 							printf("TEST: CellMetric Size to send: %d\n", sizeof(CellMetricsEntry));
-							mysend_socket((char *)cellMetrics, agent_ip, sizeof(CellMetricsEntry));
+							//mysend_socket((char *)cellMetrics, agent_ip, sizeof(CellMetricsEntry));
 							printf("======== cellMetric sent over socket  =========\n");
 							// DumpHex((char *)cellMetrics, sizeof(CellMetricsEntry));
 							printf("CellMetric - MetricType: 0x%lX\n", cellMetrics->MetricType);
@@ -1200,66 +890,42 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 							printf("CellMetric - TotNumServUEs: %ld\n", cellMetrics->TotNumServUEs);
 							printf("CellMetric - bitmap_servUEs: %x\n", cellMetrics->bitmap_servUEs);
 							printf("CellMetric - CellID: %s\n", cellMetrics->CellID);
+							
+
+							uint64_t  m_type = cellMetrics->MetricType; // This value should be 0xF0F0---------
+							uint64_t  m_time = cellMetrics->MeasUnixTime_msec; 
+							int64_t   m_ues =cellMetrics->TotNumServUEs;
+							std::string m_cellId = cellMetrics->CellID;
+
+							std::string to_print = m_cellId + "," + std::to_string (m_type) + "," + \
+							std::to_string (m_time) + "," + std::to_string (m_ues) +"\n";
+							std::cout << to_print << std::endl;
+							//char *to_send = NULL;
+							//strcpy(to_send, to_print.c_str());
+							//mysend_socket(to_send, agent_ip, to_print.length());
 						}
 					}
 					flag_cell = false;
 					free(cellMetrics);
-
-					//test - UE Metrics
-					// int test1 = sizeof(UeMetricsEntry); // 3 * sizeof(NeighborCellRFType) + sizeof(CellRFType) + 8 * 4 + 4 = 96 ==> __attribute__((__packed__))
-					// int test2 = sizeof(CellRFType); //4 * 3 = 12
-					// int test3 = sizeof(NeighborCellRFType); // 4 + sizeof(CellRFType) = 16
-					// printf("test1 : %d, test2: %d, test3: %d\n", test1, test2, test3);
 					break;
 				}
 				case 25:  // RIC indication header for E2SM-KPM
 				{
-					//struct tm *tm_info;
-					//time_t unix_timestamp;
 
 					int hdr_size = ricIndication->protocolIEs.list.array[idx]-> value.choice.RICindicationHeader.size;
-					printf("hdr_size: %d\n", hdr_size);
 					char* header = (char*) calloc(hdr_size, sizeof(char));
 					memcpy(header, ricIndication->protocolIEs.list.array[idx]-> \
 																		 value.choice.RICindicationHeader.buf, hdr_size);
 					//printf("Header %s\n", header);
 					printf("======== RIC indication header =========\n");
-					DumpHex(header, hdr_size);
-
-					// E2SM-KPM Details
-					// 1. asn1c_defs Folder: add some header files and c files into asn1c_defs: 
-					// 1-1) header files: E2SM-KPM-IndicationHeader.h, E2SM-KPM-IndicationHeader-Format1.h, TimeStamp.h
-					// 1-2) c files: E2SM-KPM-IndicationHeader.c, E2SM-KPM-IndicationHeader-Format1.c, TimeStamp.c
-					// 1-3) delete "asn_OER_.... " part
-					// 2. e2sm folder: insert some part into e2sm_indication.hpp/c
 
 					E2SM_KPM_IndicationHeader_t* decodedHdr = e2sm_decode_ric_indication_header(header, hdr_size);
-					//printf("///////////E2sm////decodedHdr= %x\n",decodedHdr);
-
 					unsigned long indHeader_present = (unsigned long) decodedHdr->present;
-					//printf("present: %ld\n", indHeader_present);
 					if (indHeader_present == 1) {
-						printf("////entered indHeader_present = 1 \n");
 						E2SM_KPM_IndicationHeader_Format1_t *indHeaderFormat1 = (decodedHdr->choice.indicationHeader_Format1);
-						//printf("pass2 \n");
 						unsigned long colTimeStamp_size = (unsigned long)(indHeaderFormat1->collectionStartTime.size);
-						printf("colTimeStamp_size: %ld\n", colTimeStamp_size); // its isze is 8
-						printf("--- collectionStartTime: byte string ---\n");
-						DumpHex((char *)(indHeaderFormat1->collectionStartTime.buf), colTimeStamp_size);
 						uint64_t valTimestamp =*(uint64_t *)(indHeaderFormat1->collectionStartTime.buf);
-						valTimestamp = REVERSE_64LONG(valTimestamp);
-						// printf("unix time (ms): %lu, unix time (sec): %lu\n", valTimestamp, (uint64_t)(floor(valTimestamp/1000.0)));
-						// unix_timestamp = (time_t) (floor(valTimestamp/1000.0)); // msec --> sec
-						// tm_info = localtime(&unix_timestamp); //gmtime : localtime
-						// printf("Year: %d, Month: %d, Day: %d, Hour: %d, Minute: %d, Second: %d, msec: %lu\n",  tm_info->tm_year + 1900, \
-						//  																			tm_info->tm_mon + 1, \
-						// 																			tm_info->tm_mday, \
-						// 																			tm_info->tm_hour + 9,\
-						// 																			tm_info->tm_min,\
-						// 																			tm_info->tm_sec, \
-						// 																			(valTimestamp - (uint64_t)(floor(valTimestamp/1000.0)) * 1000));
-						gMeasUnixTime_msec = valTimestamp;
-
+						gMeasUnixTime_msec = REVERSE_64LONG(valTimestamp);	
 						int KPMnodeIDType = (int) (indHeaderFormat1->id_GlobalE2node_ID.present);
 						if (KPMnodeIDType == 1) {
 							// To get Cell ID:
@@ -1267,26 +933,17 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 							printf("--- GlobalE2node_gNB_ID --- \n");
 							printf("--- --- plmn_id --- --- \n");
 							struct GlobalE2node_gNB_ID KPMnode = *(indHeaderFormat1->id_GlobalE2node_ID.choice.gNB);
-							/*
-							// error: variable 'GlobalE2node_gNB_ID KPMnode' has initializer but incomplete type
-							// Resolution: add some header files in msgs_proc.hpp
-							*/
 
 							int gNB_plmn_id_size = (int) (KPMnode.global_gNB_ID.plmn_id.size);
-							DumpHex((char *)(KPMnode.global_gNB_ID.plmn_id.buf), gNB_plmn_id_size);
 							strncpy(lCellID, (char *)(KPMnode.global_gNB_ID.plmn_id.buf), gNB_plmn_id_size);
-							//printf("test1 Cel ID: %s\n", lCellID);
 							
 							int gNB_gnb_id_size = (int) (KPMnode.global_gNB_ID.gnb_id.choice.gnb_ID.size);
 							int gNB_gnb_id_BitsUnused = (int) (KPMnode.global_gNB_ID.gnb_id.choice.gnb_ID.bits_unused);
 							printf("--- --- gnb_id (Unused bits: %d) --- --- \n", gNB_gnb_id_BitsUnused);
-							DumpHex((char *)(KPMnode.global_gNB_ID.gnb_id.choice.gnb_ID.buf), gNB_gnb_id_size);
 							strncpy(lCellID+3, (char *)(KPMnode.global_gNB_ID.gnb_id.choice.gnb_ID.buf), 1);
 							lCellID[4] = '\0';
-							//printf("test2 Cel ID: %s\n", lCellID);
 							strncpy(gCellID, lCellID, strlen(lCellID));
 							gCellID[4] = '\0';
-							//printf("Cell ID: %s\n", gCellID);
 
 						} else if (KPMnodeIDType == 2) {
 							printf("GlobalE2node_en_gNB_ID \n");
@@ -1301,11 +958,7 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 							printf("GlobalE2node_eNB_ID \n");
 							printf("--- --- plmn_id --- --- \n");
 							struct GlobalE2node_eNB_ID KPMnode = *(indHeaderFormat1->id_GlobalE2node_ID.choice.eNB);
-							/*
-							// error: variable 'GlobalE2node_eNB_ID KPMnode' has initializer but incomplete type
-							*/
 							int eNB_plmn_id_size = (int) (KPMnode.global_eNB_ID.pLMN_Identity.size);
-							DumpHex((char *)(KPMnode.global_eNB_ID.pLMN_Identity.buf), eNB_plmn_id_size);
 							strncpy(lCellID, (char *)(KPMnode.global_eNB_ID.pLMN_Identity.buf), eNB_plmn_id_size);
 
 							int eNB_Type = (int) (KPMnode.global_eNB_ID.eNB_ID.present);
@@ -1316,10 +969,8 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 								DumpHex((char *)(KPMnode.global_eNB_ID.eNB_ID.choice.macro_eNB_ID.buf), macro_eNB_id_size);
 								strncpy(lCellID+3, (char *)(KPMnode.global_eNB_ID.eNB_ID.choice.macro_eNB_ID.buf), 1);
 								lCellID[4] = '\0';
-								//printf("test2 Cel ID: %s\n", lCellID);
 								strncpy(gCellID, lCellID, strlen(lCellID));
 								gCellID[4] = '\0';
-								//printf("Cell ID: %s\n", gCellID);
 
 
 							} else if (eNB_Type == 2) {
@@ -1534,6 +1185,89 @@ char *ParseNRCGI(NRCGI_t nRCGI) {
 
 	return CellID;
 }
+/*
+std::string check_trace (std::string m_cellId, uint64_t  m_type){
+	if (m_type == 1) { // oDU
+		bool bool_trace = map_duFilebool[m_cellId];
+		std::string m_duFileName = "du-cell-" + m_cellId + ".txt"; 
+		if (bool_trace ) {
+			return m_duFileName;
+		} else {
+			std::ofstream csv {};
+			csv.open (m_duFileName.c_str ());
+			csv.close();
+			map_duFilebool.insert(pair<std::string, bool>(m_cellId, true));
+			return m_duFileName;
+		}
+
+	} else if (m_type == 2){ //OCUCP
+		bool bool_trace = map_cuCpFilebool[m_cellId];
+		std::string m_cuCpFileName = "cu-cp-cell-" + m_cellId + ".txt";
+
+		if (bool_trace) {
+			return m_cuCpFileName;
+		} else {
+			std::ofstream csv {};
+			csv.open (m_cuCpFileName.c_str ());
+			if (strcmp(m_cellId.c_str(), "1111") == 0 ) {
+				csv << "timestamp,ueImsiComplete,numActiveUes,DRB.EstabSucc.5QI.UEID (numDrb),"
+						"DRB.RelActNbr.5QI.UEID (0),enbdev (m_cellId),UE (imsi),sameCellSinr,"
+						"sameCellSinr 3gpp encoded,L3 neigh Id (cellId),"
+						"sinr,3gpp encoded sinr (convertedSinr)\n";
+				csv.close();
+			} else {
+				csv << "timestamp,ueImsiComplete,numActiveUes,DRB.EstabSucc.5QI.UEID (numDrb),"
+					"DRB.RelActNbr.5QI.UEID (0),L3 serving Id(m_cellId),UE (imsi),L3 serving SINR,"
+					"L3 serving SINR 3gpp,"
+					"L3 neigh Id 1 (cellId),L3 neigh SINR 1,L3 neigh SINR 3gpp 1 (convertedSinr),"
+					"L3 neigh Id 2 (cellId),L3 neigh SINR 2,L3 neigh SINR 3gpp 2 (convertedSinr),"
+					"L3 neigh Id 3 (cellId),L3 neigh SINR 3,L3 neigh SINR 3gpp 3 (convertedSinr),"
+					"L3 neigh Id 4 (cellId),L3 neigh SINR 4,L3 neigh SINR 3gpp 4 (convertedSinr),"
+					"L3 neigh Id 5 (cellId),L3 neigh SINR 5,L3 neigh SINR 3gpp 5 (convertedSinr),"
+					"L3 neigh Id 6 (cellId),L3 neigh SINR 6,L3 neigh SINR 3gpp 6 (convertedSinr),"
+					"L3 neigh Id 7 (cellId),L3 neigh SINR 7,L3 neigh SINR 3gpp 7 (convertedSinr),"
+					"L3 neigh Id 8 (cellId),L3 neigh SINR 8,L3 neigh SINR 3gpp 8 (convertedSinr)"
+					"\n";
+				csv.close(); std::string m_cuCpFileName = "cu-cp-cell-" + m_cellId + ".txt";
+			}
+			map_cuCpFilebool.insert(pair<std::string, bool>(m_cellId, true));
+			return m_cuCpFileName;
+		}
+	} else if (m_type == 3) { //OCUUP
+		bool bool_trace = map_cuUpFilebool[m_cellId];
+		std::string m_cuUpFileName = "cu-up-cell-" + m_cellId + ".txt";
+
+		if (bool_trace) {
+			return m_cuUpFileName;
+		} else {
+			std::ofstream csv {};
+			csv.open (m_cuUpFileName.c_str ());
+			if (strcmp(m_cellId.c_str(), "1111") == 0 ) {
+				csv << "timestamp,ueImsiComplete,DRB.PdcpSduDelayDl (cellAverageLatency),"
+						"m_pDCPBytesUL (0),m_pDCPBytesDL (cellDlTxVolume),"
+						"DRB.PdcpSduVolumeDl_Filter.UEID (txBytes),"
+						"Tot.PdcpSduNbrDl.UEID (txDlPackets),DRB.PdcpSduBitRateDl.UEID (pdcpThroughput),"
+						"DRB.PdcpSduDelayDl.UEID (pdcpLatency),QosFlow.PdcpPduVolumeDL_Filter.UEID"
+						"(txPdcpPduBytesNrRlc),DRB.PdcpPduNbrDl.Qos.UEID (txPdcpPduNrRlc)\n";
+				csv.close();
+			} else {
+				csv << "timestamp,ueImsiComplete,DRB.PdcpSduDelayDl (cellAverageLatency),"
+					"m_pDCPBytesUL (0),"
+					"m_pDCPBytesDL (cellDlTxVolume),DRB.PdcpSduVolumeDl_Filter.UEID (txBytes),"
+					"Tot.PdcpSduNbrDl.UEID (txDlPackets),DRB.PdcpSduBitRateDl.UEID"
+					"(pdcpThroughput),"
+					"DRB.PdcpSduDelayDl.UEID (pdcpLatency),QosFlow.PdcpPduVolumeDL_Filter.UEID"
+					"(txPdcpPduBytesNrRlc),DRB.PdcpPduNbrDl.Qos.UEID (txPdcpPduNrRlc)\n";
+				csv.close ();
+			}
+			map_cuUpFilebool.insert(pair<std::string, bool>(m_cellId, true));
+			return  m_cuUpFileName;
+		}
 
 
+	} else{
+		printf("Unsupported Message Type\n");
+	}
+}
+*/
 

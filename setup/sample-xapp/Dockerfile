@@ -57,10 +57,19 @@ RUN apt-get update  \
     cpputest \
     libboost-all-dev \
     libhiredis-dev \
+# Jlee insert
+    openssh-server \
+    iputils-ping \
+    net-tools \ 
+# Jlee insert    
   && apt-get remove -y --purge python* \
   && apt-get install -y \
     python3 \
     python3-pip \
+
+# Jlee insert
+ # && install statsd joblib numpy watchdog statsd-tags\
+ # && install statsd-telegraf --user \
 # Install mdclog using debian package hosted at packagecloud.io
   && wget -nv --content-disposition https://packagecloud.io/o-ran-sc/release/packages/debian/stretch/mdclog_${MDC_VER}_amd64.deb/download.deb \
   && wget -nv --content-disposition https://packagecloud.io/o-ran-sc/release/packages/debian/stretch/mdclog-dev_${MDC_VER}_amd64.deb/download.deb \

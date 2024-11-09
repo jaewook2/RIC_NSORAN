@@ -92,6 +92,9 @@
 #include <math.h>
 
 #include "e2sm_indication.hpp"
+
+#include <fstream> // jlee
+#include <iostream> // jlee
 // SEHONG - END
 
 #define MAX_RMR_RECV_SIZE 2<<15
@@ -196,6 +199,13 @@ class XappMsgHandler{
 private:
 	std::string xapp_id;
 	SubscriptionHandler *_ref_sub_handler;
+
+    //std::map < std::string, bool> map_cuCpFilebool; 
+    //std::map < std::string, bool> map_cuUpFilebool; 
+    //std::map < std::string, bool> map_duFilebool;
+    
+    //std::string check_trace (std::string m_cellId, uint64_t  m_type);
+
 public:
 	//constructor for xapp_id.
 	 XappMsgHandler(std::string xid){xapp_id=xid; _ref_sub_handler=NULL;};
@@ -211,6 +221,8 @@ public:
 	 bool a1_policy_handler(char *, int* , a1_policy_helper &);
 
 	 void testfunction() {std::cout << "<<<<<<<<<<<<<<<<<<IN TEST FUNCTION<<<<<<<<<<<<<<<" << std::endl;}
+    // log file을 위한 data 전송
+
 };
 
 

@@ -58,7 +58,7 @@ remove_container() {
 remove_container ${CONTAINER_NAME}
 
 # replace parameters, recompile code and restart container
-$SUDO docker run -d -it --entrypoint ${ENTRYPOINT} --network ric --ip ${XAPP_IP} \
+$SUDO docker run -d -it --entrypoint ${ENTRYPOINT} --network ric --ip ${XAPP_IP} -p 8081:22 \
     -e DBAAS_SERVICE_HOST=$DBAAS_IP -e DBAAS_SERVICE_PORT=$DBAAS_PORT --name ${CONTAINER_NAME} ${IMAGE_NAME}:latest
 
 if [ -n "${GNB_ID}" ]; then

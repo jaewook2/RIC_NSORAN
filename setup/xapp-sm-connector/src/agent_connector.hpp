@@ -13,7 +13,7 @@
 #include <map>
 #include <vector>
 
-#define AGENT_0 "127.0.0.1"
+#define AGENT_0 "10.0.2.1" //"127.0.0.1" change IP
 
 // vector of agent IPs
 extern std::vector<std::string> drl_agent_ip;
@@ -29,5 +29,6 @@ void close_control_socket_agent(void);
 std::string find_agent_ip_from_gnb(unsigned char* gnb_id);
 int send_socket(char* buf, std::string dest_ip);
 int mysend_socket(char* buf, std::string dest_ip, int payload_size);
+int mysend_socket_string(std::string buf, std::string dest_ip);
 
 #endif
