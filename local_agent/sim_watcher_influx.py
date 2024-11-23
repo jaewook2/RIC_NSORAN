@@ -13,9 +13,9 @@ from influxdb import InfluxDBClient
 
 
 lock = threading.Lock()
-#pip3 install statsd joblib numpy watchdog statsd-tags
-#pip3 install statsd-telegraf --user
+#pip3 install  joblib numpy watchdog
 # pip install influxdb, watchdog
+
 class SimWatcher(PatternMatchingEventHandler):
  
     patterns = ['cu-up-cell-*.txt', 'cu-cp-cell-*.txt', "du-cell-*.txt"]
@@ -45,7 +45,7 @@ class SimWatcher(PatternMatchingEventHandler):
         PatternMatchingEventHandler.__init__(self, patterns=self.patterns,
                                              ignore_patterns=[],
                                              ignore_directories=True, case_sensitive=False)
-        self.directory = ''
+        self.directory = '/home/boo/RIC_NSORAN/local_agent/logfiles/'
         self.consumed_keys = set()
 
     def on_created(self, event):
@@ -77,16 +77,14 @@ class SimWatcher(PatternMatchingEventHandler):
                     key = (timestamp, ue_imsi, 0)
                 if re.search('cu-cp-cell-[2-5].txt', file.name):
                     key = (timestamp, ue_imsi, 1)
-                if re.search('du-cell-[1-5].txt', file.name):
+                if re.search('du-cell-[2-5].txt', file.name):
                     key = (timestamp, ue_imsi, 2)
-                if  file.name == './cu-up-cell-1.txt':
+                if  re.search('cu-up-cell-1.txt', file.name): 
                     key = (timestamp, ue_imsi, 3)   # to see data for eNB cell
-                if file.name == './cu-cp-cell-1.txt':
+                if re.search('cu-cp-cell-1.txt', file.name): 
                     key = (timestamp, ue_imsi, 4)   # same here
-
-
+                    
                 if key not in self.consumed_keys:
-
                     if key not in self.kpm_map:
                         self.kpm_map[key] = []
 
@@ -103,7 +101,8 @@ class SimWatcher(PatternMatchingEventHandler):
                     self.kpm_map[key].append(regex.group(1))      # last item of list will be file_id_number
 
                     self.consumed_keys.add(key)
-                    self._send_to_telegraf(ue=ue, values=self.kpm_map[key], fields=fields, file_type=key[2])
+                    print ("Write the recived data at xAPP to Influx DB")
+                    self._send_to_influxDB(ue=ue, values=self.kpm_map[key], fields=fields, file_type=key[2])
 
         lock.release()
 
@@ -115,7 +114,7 @@ class SimWatcher(PatternMatchingEventHandler):
 
         super().on_closed(event)
 
-    def _send_to_telegraf(self, ue:int, values:List, fields:List, file_type:int):
+    def _send_to_influxDB(self, ue:int, values:List, fields:List, file_type:int):
 
         """
         Formats and sends data to the Telegraf agent.
@@ -125,7 +124,7 @@ class SimWatcher(PatternMatchingEventHandler):
         ue : int
             Value extracted from csv, represents the ue.
         values : List
-            List of metrics to send to Telegraf.
+            List of metrics to send to influxDB.
         fields : List
             List of field names corresponding to the metrics in the values parameter.
         file_type: int
@@ -144,21 +143,28 @@ class SimWatcher(PatternMatchingEventHandler):
         i = 0
         influx_points = []
         
+        cellId = '0'
+        # L3servingSINR_Cell_#_UE_#
+        
         for field in fields:
-            print(field)
+            stat = field
+            
             if field == 'file_id_number':
                 continue
 
             # convert pdcp_latency
             if field == 'DRB.PdcpSduDelayDl.UEID (pdcpLatency)':
                 values[i] = values[i]*pow(10, -1)
+                
+            if 'L3' in field and 'cellId' in field:
+                cellId = values[i]
 
-            if 'UEID' not in field:
+            if 'SINR' in field:
+                stat = stat + '_cell_' + str(int(cellId)) 
+                
+            if 'UEID' not in field and 'L3' not in field:
                 stat = field + '_cell_' + values[-1]
                 stat = stat.replace(' ','')
-
-
-                #pipe.gauge(stat=stat, value=values[i], tags={'timestamp':timestamp})
                 influx_point = {
                     "measurement": stat,
                     "tags": {
@@ -172,7 +178,7 @@ class SimWatcher(PatternMatchingEventHandler):
                 i+=1
                 continue
 
-            stat = field + '_' + ue
+            stat = stat + '_ue_' + ue
             if file_type == 0 or file_type == 3:
                 stat += '_up'
             if file_type == 1 or file_type == 4:
@@ -181,8 +187,7 @@ class SimWatcher(PatternMatchingEventHandler):
                 stat += '_du'
             stat = stat.replace(' ','')
             print (stat)
-            print (values[i])
-            #pipe.gauge(stat=stat, value = values[i])#, tags={'timestamp':timestamp})
+
             influx_point = {
                 "measurement": stat,
                 "tags": {
@@ -192,6 +197,7 @@ class SimWatcher(PatternMatchingEventHandler):
                     "value": values[i]
                 }
             }
+            
             influx_points.append(influx_point)
             i+=1
         #pipe.send()
@@ -201,7 +207,7 @@ class SimWatcher(PatternMatchingEventHandler):
 if __name__ == "__main__":
     event_handler = SimWatcher()
     observer = Observer()
-    observer.schedule(event_handler, ".",  recursive=False)
+    observer.schedule(event_handler, "/home/boo/RIC_NSORAN/local_agent/logfiles/",  recursive=False)
     observer.start()
     
     try:

@@ -268,7 +268,6 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
    {
       switch(ricIndication->protocolIEs.list.array[idx]->id)
       {			
-				
 				case 29:  // RIC request ID
 				{
 					RICrequestID_t	 cur_RICrequestID = ricIndication->protocolIEs.list.array[idx]-> value.choice.RICrequestID;
@@ -323,9 +322,9 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 								if (perfContainerType == 1) {
 									struct ODU_PF_Container	*oDU_PF = pmContainer.performanceContainer->choice.oDU;
 									int count_oDUcellResourceReportListItem = oDU_PF->cellResourceReportList.list.count;
-
+									// initial 
 									// Cell Metric: PRBUsage (AvailablePRBs)
-									if ((gPFContainterType == 1) && (flag_cell == false)) {
+									if (flag_cell == false) {
 										cellMetrics = (CellMetricsEntry *) malloc(sizeof(CellMetricsEntry));
 										flag_cell = true;
 										cellMetrics->MetricType = gPFContainterType; 
@@ -334,7 +333,7 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 									}
 									//////////
 									// Ue Metric: DlThp 
-									if ((gPFContainterType == 1) && (flag_ue == false)) {
+									if (flag_ue == false) {
 										ueMetrics = (UeMetricsEntry *) malloc(sizeof(UeMetricsEntry));
 										flag_ue = true;
 										ueMetrics->MetricType = gPFContainterType; // Cell Metric for O-CUUP (gPFContainterType == 3)
@@ -424,7 +423,17 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 										}
 									}
 								} else if (perfContainerType == 2) {
-									if (!flag_ue && (strcmp(gCellID, "1111") != 0)) {
+									if (!flag_cell) {
+										cellMetrics = (CellMetricsEntry *) malloc(sizeof(CellMetricsEntry));
+										flag_cell = true;
+										cellMetrics->MetricType = gPFContainterType; // Cell Metric for O-CUUP (gPFContainterType == 3)
+										cellMetrics->MeasUnixTime_msec = gMeasUnixTime_msec;
+										strncpy(cellMetrics->CellID, gCellID, strlen(gCellID));
+										cellMetrics->CellID[strlen(gCellID)] = '\0';
+									}
+									
+									
+									if (!flag_ue ) {
 										ueMetrics = (UeMetricsEntry *) malloc(sizeof(UeMetricsEntry));
 										flag_ue = true;
 										ueMetrics->MetricType = gPFContainterType; // Ue Metric for O-CUCP (gPFContainterType == 2)
@@ -437,6 +446,7 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 									if (oCUCP_PF->cu_CP_Resource_Status.numberOfActive_UEs != NULL) {
 										nActUEs = *(long *)(oCUCP_PF->cu_CP_Resource_Status.numberOfActive_UEs);
 									} 
+
 								} else if (perfContainerType == 3) { //O-CUUP message
 									if (!flag_cell) {
 										cellMetrics = (CellMetricsEntry *) malloc(sizeof(CellMetricsEntry));
@@ -447,6 +457,15 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 										cellMetrics->CellID[strlen(gCellID)] = '\0';
 									}
 
+									if (!flag_ue ) {
+										ueMetrics = (UeMetricsEntry *) malloc(sizeof(UeMetricsEntry));
+										flag_ue = true;
+										ueMetrics->MetricType = gPFContainterType; // Ue Metric for O-CUCP (gPFContainterType == 2)
+										ueMetrics->MeasUnixTime_msec = gMeasUnixTime_msec;
+										strncpy(ueMetrics->ServingCellID, gCellID, strlen(gCellID));
+										ueMetrics->ServingCellID[strlen(gCellID)] = '\0';
+									}
+									
 									struct OCUUP_PF_Container	*oCUUP_PF = pmContainer.performanceContainer->choice.oCU_UP;
 									int count_oCUUPpfContainerListItem = oCUUP_PF->pf_ContainerList.list.count;
 									for (int j = 0; j < count_oCUUPpfContainerListItem; j++) {
@@ -572,9 +591,7 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 												}
 											}
 										}
-									} else {
-										printf("Invalid pmValue type \n");
-									}
+									} else { printf("Invalid pmValue type \n"); }
 								// Cell Metric: RRU.PrbUsedDl
 									if (strncmp(tempMeasurementTypeName, "RRU.PrbUsedDl", strlen("RRU.PrbUsedDl")) == 0) { //MeasurementTypeName == "RRU.PrbUsedDl"
 										if ((gPFContainterType == 1) && (flag_cell)) {
@@ -766,98 +783,116 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 											ueMetrics->DL_throughput = temp_DRB_UEThpDl_UEID;
 										}
 									}
-									///////////////////
-								}  
+								}
+									/////////////////// 
 								// Ue Metric: Sending the completed Ue Metric for a specific UE over socket
-								if (flag_ue) { // O-CU-CP or O-DU
-									/*
-									printf("======== ueMetric in O-CU-CP is about to be sent over socket  =========\n");
-									printf("UeMetric - MetricType: 0x%lX\n", ueMetrics->MetricType);
-									printf("UeMetric - MeasUnixTime_msec: %lu\n", ueMetrics->MeasUnixTime_msec);
-									printf("UeMetric - MatchedUEsTotNum: %d\n", ueMetrics->MatchedUEsTotNum);
-									printf("UeMetric - RemainingUEsCount: %d\n", ueMetrics->RemainingUEsCount);
-									printf("UeMetric - UeID: %lu\n", ueMetrics->UeID);
-									printf("UeMetric - DlThp (effective only in O-DU): %f\n", ueMetrics->DL_throughput);
-									printf("UeMetric - svcID : %s\n", ueMetrics->ServingCellID);
-									printf("UeMetric - svcRF-RSSINR : %ld\n", ueMetrics->ServingCellRF.RSSINR);
-									printf("UeMetric - ngcID1 : %lu\n", ueMetrics->NeighborCell1_RF.CellID);
-									printf("UeMetric - ngcRF1-RSSINR : %ld\n", ueMetrics->NeighborCell1_RF.CellRF.RSSINR);
-									printf("UeMetric - ngcID2 : %lu\n", ueMetrics->NeighborCell2_RF.CellID);
-									printf("UeMetric - ngcRF2-RSSINR : %ld\n", ueMetrics->NeighborCell2_RF.CellRF.RSSINR);
-									printf("UeMetric - ngcID3 : %lu\n", ueMetrics->NeighborCell3_RF.CellID);
-									printf("UeMetric - ngcRF3-RSSINR : %ld\n", ueMetrics->NeighborCell3_RF.CellRF.RSSINR);
-									
-									printf("TEST: UeMetric Size to send: %d\n", sizeof(UeMetricsEntry));
-									*/
-									if (ueMetrics->MetricType == 2){
-									// for cucp message
-										std::string m_cellId = ueMetrics->ServingCellID;
-										uint64_t imsi = ueMetrics->UeID;
-										int64_t sinrThisCell = ueMetrics->ServingCellRF.RSSINR;										
-										uint64_t neighcellId1 = ueMetrics->NeighborCell1_RF.CellID;
-										int64_t neighcellSINR1 =ueMetrics->NeighborCell1_RF.CellRF.RSSINR;
-										uint64_t neighcellId2 = ueMetrics->NeighborCell2_RF.CellID;
-										int64_t neighcellSINR2 =ueMetrics->NeighborCell2_RF.CellRF.RSSINR;
-										uint64_t neighcellId3 = ueMetrics->NeighborCell3_RF.CellID;
-										int64_t neighcellSINR3 =ueMetrics->NeighborCell3_RF.CellRF.RSSINR;
-										
-										printf("CU-CP Message from %s gNB with informations\n",  ueMetrics->ServingCellID);
-										std::string to_show = "Time : "+ std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + "Imsi of UE : " +std::to_string (imsi) + "," +\
-										"Number of associated UEs : "+ std::to_string (ueMetrics->MatchedUEsTotNum) + \
-										"\n" + "," +"SINR between Serving Cell and UE :" + std::to_string (sinrThisCell) +"\n" \
-										+"SINR between Cell (ID:" + std::to_string (neighcellId1)+ ") and UE :" + std::to_string (neighcellSINR1) +"\n"\
-										+"SINR between Cell (ID:" + std::to_string (neighcellId2)+ ") and UE :" + std::to_string (neighcellSINR2) +"\n"\
-										+"SINR between Cell (ID:" + std::to_string (neighcellId3)+ ") and UE :" + std::to_string (neighcellSINR3) +"\n"\
-										// cucp message
-										std::string reprot_type = "";
-										if (ueMetrics->MetricType == 1){
-											reprot_type = "du";
-										} else if (ueMetrics->MetricType == 2){
-											reprot_type = "cucp";
+								if (flag_ue) {
+									std::string m_cellId = ueMetrics->ServingCellID;
+									int int_cellId = stoi (m_cellId);
+									int_cellId = int_cellId - 1110;
+									uint64_t imsi = ueMetrics->UeID;
+									int64_t sinrThisCell = ueMetrics->ServingCellRF.RSSINR;										
+									uint64_t neighcellId1 = ueMetrics->NeighborCell1_RF.CellID;
+									int64_t neighcellSINR1 =ueMetrics->NeighborCell1_RF.CellRF.RSSINR;
+									uint64_t neighcellId2 = ueMetrics->NeighborCell2_RF.CellID;
+									int64_t neighcellSINR2 =ueMetrics->NeighborCell2_RF.CellRF.RSSINR;
+									uint64_t neighcellId3 = ueMetrics->NeighborCell3_RF.CellID;
+									int64_t neighcellSINR3 =ueMetrics->NeighborCell3_RF.CellRF.RSSINR;
+									std::string reprot_type = "";
+									std::string to_print = "msg:"+std::to_string(int_cellId)+"."+std::to_string(imsi)+".";
+									if (ueMetrics->MetricType == 1){
+										reprot_type = "du";
+										printf ("Skip the processing DU message\n");
+									} else if (ueMetrics->MetricType == 2) {
+										printf("Parsing and Sending CU_CP message\n");
+										reprot_type = "cucp";
+										if (ueMetrics->ServingCellID == "1111"){
+											/*
+											 the string is timestamp, ueImsiComplete, numActiveUes, DRB.EstabSucc.5QI.UEID (numDrb), DRB.RelActNbr.5QI.UEID (0), enbdev (m_cellId),UE (imsi),sameCellSinr,"
+                 							"sameCellSinr 3gpp encoded,L3 neigh Id (cellId)," "sinr,3gpp encoded sinr (convertedSinr)\n";
+											*/
+								      		to_print = to_print+reprot_type +"."+ std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + std::to_string (imsi) + "," +\
+											std::to_string (ueMetrics->MatchedUEsTotNum) + "," + "0" +","+"0"+  ","+ std::to_string(int_cellId) + ","  + std::to_string (imsi) + "," + std::to_string (sinrThisCell) + "," + "0";
 										} else {
-											reprot_type = "cuup";
+											/*
+											*/
+											to_print =to_print+ reprot_type +"."+ std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + std::to_string (imsi) + "," +\
+											std::to_string (ueMetrics->MatchedUEsTotNum) + "," + "0" +","+"0";
+
+											std::string servingStr = ","+std::to_string(int_cellId)+ ","  + std::to_string (imsi) + "," + std::to_string (sinrThisCell) + "," + "0";
+											std::string neighsinr = "," + std::to_string (neighcellId1) + "," + std::to_string (neighcellSINR1) + "," + "0"\
+																+ "," + std::to_string (neighcellId2) + "," + std::to_string (neighcellSINR2) + "," + "0" \
+																+"," + std::to_string (neighcellId3) + "," + std::to_string (neighcellSINR3) + "," + "0" \
+																+"," + std::to_string (0) + "," + std::to_string (0) + "," + "0" \
+																+"," + std::to_string (0) + "," + std::to_string (0) + "," + "0" \
+																+"," + std::to_string (0) + "," + std::to_string (0) + "," + "0" \
+																+"," + std::to_string (0) + "," + std::to_string (0) + "," + "0" \
+																+"," + std::to_string (0) + "," + std::to_string (0) + "," + "0" ;
+											to_print = to_print + servingStr +neighsinr;
+											std::cout << to_print << std::endl;
 										}
-										std::string to_print = reprot_type +","+ std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + std::to_string (imsi) + "," +\
-										std::to_string (ueMetrics->MatchedUEsTotNum) + "," + "numDrb" +","+"5QI";
+									} else if (ueMetrics->MetricType == 3) {
+										printf("Parsing and Sending CU_UP message\n");
 
-										std::string servingStr = ","+ m_cellId + ","  + std::to_string (imsi) + "," + std::to_string (sinrThisCell) + "," + std::to_string (0) ;
-										std::string neighsinr = "," + std::to_string (neighcellId1) + "," + std::to_string (neighcellSINR1) + "," + std::to_string (0) \
-															+ "," + std::to_string (neighcellId2) + "," + std::to_string (neighcellSINR2) + "," + std::to_string (0)  \
-															+"," + std::to_string (neighcellId3) + "," + std::to_string (neighcellSINR3) + "," + std::to_string (0)  \
-															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
-															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
-															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
-															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
-															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  \
-															+"," + std::to_string (0) + "," + std::to_string (0) + "," + std::to_string (0)  ;
-										to_print = to_print + servingStr +neighsinr;
-										
-										printf("Sending Message to Agent : ");
-										std::cout << to_print << std::endl;
+										reprot_type = "cuup";
+										if (ueMetrics->ServingCellID == "1111"){
+											/*
+											// the string is timestamp,ueImsiComplete, DRB.PdcpSduDelayDl (cellAverageLatency),
+											// m_pDCPBytesUL (0),m_pDCPBytesDL (cellDlTxVolume),DRB.PdcpSduVolumeDl_Filter.UEID (txBytes),
+											// Tot.PdcpSduNbrDl.UEID (txDlPackets),DRB.PdcpSduBitRateDl.UEID (pdcpThroughput),
+											// DRB.PdcpSduDelayDl.UEID (pdcpLatency),QosFlow.PdcpPduVolumeDL_Filter.UEID (txPdcpPduBytesNrRlc),
+											// DRB.PdcpPduNbrDl.Qos.UEID (txPdcpPduNrRlc)
 
-										mysend_socket_string(to_print, agent_ip);
-										
-										//std::string fileName = check_trace (m_cellId, ueMetrics->MetricType);
-										//bool ret = XappMsgHandler::writeTrace (fileName, to_print );
-										//std::ofstream csv{};
-      									//csv.open (fileName.c_str (), std::ios_base::app);
-										//to_print = to_print + "\n";
-										//csv << to_print;
-										//csv.close ();
-										
-										//map_ue_information.insert(pair<int,  std::string>(i, to_print));
+								      		std::string to_print = "msg:"+ reprot_type +","+ \
+											std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + std::to_string (imsi) + "," + "DRB.PdcpSduDelayDl (cellAverageLatency)" + "," + \
+											"0" +","+"m_pDCPBytesDL"+  ","+ "DRB.PdcpSduVolumeDl_Filter.UEID (txBytes)" + "," +\ 
+											"Tot.PdcpSduNbrDl.UEID (txDlPackets)" + "," + "DRB.PdcpSduBitRateDl.UEID (pdcpThroughput)" + "," +\
+											" DRB.PdcpSduDelayDl.UEID (pdcpLatency)" + "QosFlow.PdcpPduVolumeDL_Filter.UEID (txPdcpPduBytesNrRlc)" + "," +\
+											"DRB.PdcpPduNbrDl.Qos.UEID (txPdcpPduNrRlc)";
+											*/
+											to_print = to_print+ reprot_type +"."+ \
+											std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + std::to_string (imsi) + "," + "0" + "," + \
+											"1" +","+"2"+  ","+ "3" + "," +\ 
+											"4" + "," + "5" + "," +\
+											"6" + "7" + "," +\
+											"8";
+
+										} else {
+											/*
+											// the string is timestamp,ueImsiComplete, DRB.PdcpSduDelayDl (cellAverageLatency),
+											// m_pDCPBytesUL (0),m_pDCPBytesDL (cellDlTxVolume),DRB.PdcpSduVolumeDl_Filter.UEID (txBytes),
+											// Tot.PdcpSduNbrDl.UEID (txDlPackets),DRB.PdcpSduBitRateDl.UEID (pdcpThroughput),
+											// DRB.PdcpSduDelayDl.UEID (pdcpLatency),QosFlow.PdcpPduVolumeDL_Filter.UEID (txPdcpPduBytesNrRlc),
+											// DRB.PdcpPduNbrDl.Qos.UEID (txPdcpPduNrRlc)
+																			      		std::string to_print = "msg:"+ reprot_type +","+ \
+											std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + std::to_string (imsi) + "," + "DRB.PdcpSduDelayDl (cellAverageLatency)" + "," + \
+											"0" +","+"m_pDCPBytesDL"+  ","+ "DRB.PdcpSduVolumeDl_Filter.UEID (txBytes)" + "," +\ 
+											"Tot.PdcpSduNbrDl.UEID (txDlPackets)" + "," + "DRB.PdcpSduBitRateDl.UEID (pdcpThroughput)" + "," +\
+											" DRB.PdcpSduDelayDl.UEID (pdcpLatency)" + "QosFlow.PdcpPduVolumeDL_Filter.UEID (txPdcpPduBytesNrRlc)" + "," +\
+											"DRB.PdcpPduNbrDl.Qos.UEID (txPdcpPduNrRlc)";
+											*/
+											to_print = to_print+ reprot_type +"."+ \
+											std::to_string ( ueMetrics->MeasUnixTime_msec) + "," + std::to_string (imsi) + "," + "0" + "," + \
+											"8" +","+"7"+  ","+ "6" + "," +\ 
+											"5" + "," + "4" + "," +\
+											"3" + ","+ "2" + "," +\
+											"1";
+										}
 									}
 
-									if (ueMetrics->RemainingUEsCount > 0) {
-										printf("TEST: another ue Metric shoud be delivered over socket\n");
-									} else if (ueMetrics->RemainingUEsCount == 0) {
-										flag_ue = false;
-										free(ueMetrics);
-									} 
+									if (ueMetrics->MetricType != 1) {
+										mysend_socket_string(to_print, agent_ip);
+									}
 								}
-								//////////////////
 
+								if (ueMetrics->RemainingUEsCount > 0) {
+									//printf("TEST: another ue Metric shoud be delivered over socket\n");
+								} else if (ueMetrics->RemainingUEsCount == 0) {
+									flag_ue = false;
+									free(ueMetrics);
+								} 																		
 							}
+								//////////////////
 							/// Cell Metric Sent!!!
 							if ((flag_cell) && gPFContainterType == 3) {
 								cellMetrics->bitmap_servUEs = indicatorMapUE;
@@ -872,10 +907,7 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 
 
 					// print ue information
-
-
-
-					if (strcmp(gCellID, "1111") != 0) {
+					if (flag_cell) {
 						printf("Cell ID is %s (This value should not be <1111>)\n", gCellID);
 						if (flag_cell) {
 							// 
@@ -890,8 +922,6 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 							printf("CellMetric - TotNumServUEs: %ld\n", cellMetrics->TotNumServUEs);
 							printf("CellMetric - bitmap_servUEs: %x\n", cellMetrics->bitmap_servUEs);
 							printf("CellMetric - CellID: %s\n", cellMetrics->CellID);
-							
-
 							uint64_t  m_type = cellMetrics->MetricType; // This value should be 0xF0F0---------
 							uint64_t  m_time = cellMetrics->MeasUnixTime_msec; 
 							int64_t   m_ues =cellMetrics->TotNumServUEs;
@@ -904,9 +934,9 @@ uint8_t procRicIndication(E2AP_PDU_t *e2apMsg, transaction_identifier gnb_id)
 							//strcpy(to_send, to_print.c_str());
 							//mysend_socket(to_send, agent_ip, to_print.length());
 						}
+						flag_cell = false;
+						free(cellMetrics);
 					}
-					flag_cell = false;
-					free(cellMetrics);
 					break;
 				}
 				case 25:  // RIC indication header for E2SM-KPM
